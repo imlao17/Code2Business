@@ -71,8 +71,16 @@ python3 -m pip install cli/dist/c2b-*.whl
 # 初始化数据库后先完成确定性扫描
 c2b init
 c2b scan /path/to/legacy-code --name legacy-system
-# 任选其一：配置 Provider 后运行 label，或交由当前 Agent 生成并导入语义 JSON
+# 方案 A：云端 Provider（配置 OpenAI Compatible 或 Anthropic Native 后运行）
 c2b label 1 --limit 200
+
+# 方案 B：当前 Agent（无需在 C2B 配置外部 Key）
+c2b export-evidence 1 --output evidence.json
+c2b agent-schema > semantic-result.json
+# 让当前 Agent 根据源码和 evidence.json 填写 semantic-result.json
+c2b import-semantic 1 --input semantic-result.json
+
+# 模块规格仍需要云端 Provider
 c2b module-specs 1
 c2b docs 1 --type overview --output 系统现状说明书.md
 c2b docs 1 --type rules --output 业务规则清单.md

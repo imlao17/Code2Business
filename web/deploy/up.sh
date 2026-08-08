@@ -43,5 +43,5 @@ docker compose up -d
 
 echo ""
 echo "✅ 已启动：http://localhost:8080"
-echo "   LLM Key：打开网页后右上角「LLM 设置」配置"
+echo "   模型设置：打开网页后右上角「LLM 设置」选择 OpenAI Compatible 或 Anthropic Native 并配置"
 echo "   停止：./down.sh"
