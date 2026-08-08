@@ -31,7 +31,8 @@ pip install -i https://pypi.tuna.tsinghua.edu.cn/simple dist/*.whl
 ```bash
 mkdir -p ~/.c2b
 cat > ~/.c2b/config.json <<'EOF'
-{ "llm_base_url": "https://api.deepseek.com/v1",
+{ "llm_provider": "openai_compatible",
+  "llm_base_url": "https://api.deepseek.com/v1",
   "llm_api_key": "sk-你的key",
   "llm_model": "deepseek-chat", "llm_mode": "api" }
 EOF
@@ -48,6 +49,9 @@ c2b scan <代码目录> --name <项目名> --probe-only
 c2b status <project_id>                   # 流程状态（✅🔄⬜ 六步）
 c2b label <project_id> --limit 100        # AI 标注：域/对象/规则/流程/推演
       # 可选：--concurrency 16（并发）、--model deepseek-chat（快）、--no-cache
+c2b export-evidence <project_id> --output evidence.json  # 导出当前 Agent 可审阅的图谱证据
+c2b agent-schema > semantic-result.json                  # 输出 Agent Native JSON 模板
+c2b import-semantic <project_id> --input semantic-result.json  # 校验并原子导入业务语义
 c2b module-specs <project_id>             # 全部模块需求规格
       # 可选：--name Sms01206（按名）、--module <id>、--force（绕过缓存）
 c2b docs <project_id> --type overview     # 交付文档（md/word）
@@ -78,12 +82,38 @@ c2b scan /path/to/code --name 项目A --probe-only
 c2b scan /path/to/code --name 项目A --project-id <project_id>
 ```
 
+## 两条语义路径：云端 Provider 或当前 Agent
+
+### 云端 Provider（适合自动化、CI、无人值守）
+
+`c2b label`、`c2b module-specs`、`c2b qa` 使用 `~/.c2b/config.json` 或 `C2B_LLM_*` 环境变量。
+
+- `llm_provider: "openai_compatible"`：默认，适用于 OpenAI、DeepSeek、Kimi、Ollama 和自建服务；自定义地址必须实现 `/chat/completions`。
+- `llm_provider: "anthropic"`：Claude 原生 Messages API；通常使用 `llm_base_url: "https://api.anthropic.com"`。
+
+自定义 URL 不会被自动猜测协议：选择与服务实际实现一致的 Provider。现有未设置 `llm_provider` 的配置会自动保持 OpenAI Compatible 行为。
+
+### Agent Native（适合 Codex / Claude Code 等交互式 Agent）
+
+这条路径**不调用也不要求配置外部模型 Key**。先完成扫描，然后让当前 Agent 阅读代码与导出的确定性证据，按模板生成 JSON，再由 CLI 校验和导入：
+
+```bash
+c2b scan /path/to/code --name 项目A
+c2b export-evidence 1 --output evidence.json
+c2b agent-schema > semantic-result.json
+# 让当前 Agent 根据 evidence.json 和源码填充 semantic-result.json
+c2b import-semantic 1 --input semantic-result.json
+c2b docs 1 --type overview --output 系统现状说明书.md
+```
+
+导入会验证每条规则的文件、行号和方法均来自本次完成扫描；无效、跨项目或伪造证据会拒绝整个导入，不会写入半成品。导入仅替换未人工确认的 AI/Agent 语义，已确认或已修改的规则、对象和流程会保留。`module-specs`、`qa` 仍需云端 Provider；可只导出无需 LLM 的文档。
+
 ## 哪些功能需要 LLM？
 
 | 能力 | 是否需要 LLM | 说明 |
 |---|---|---|
 | Probe、代码扫描、模块/方法/API/SQL/表图谱 | 否 | 可离线完成；默认写入 SQLite 或指定数据库 |
-| 业务域、对象、规则、流程、主线 | 是 | 执行 `c2b label` 时调用 OpenAI 兼容 LLM |
+| 业务域、对象、规则、流程、主线 | 可选 | `label` 调用云端 Provider；或由当前 Agent 生成结构化 JSON 后 `import-semantic` |
 | 模块需求规格、AI 问答 | 是 | 使用相同 LLM 配置，结果可缓存 |
 | Markdown / Word / Excel / ZIP 导出 | 否 | 依赖已有扫描或业务知识数据 |
 

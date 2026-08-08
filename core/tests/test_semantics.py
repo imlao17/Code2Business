@@ -9,6 +9,7 @@ from c2b import models
 from c2b.db import Base
 from c2b.llm import LLMClient
 from c2b.semantics.chain import run_chain
+from c2b.semantics.agent_native import AgentSemanticError, export_evidence, import_semantic
 from c2b.semantics.run import pick_methods, run_label
 
 
@@ -175,6 +176,40 @@ class RelabelSafetyTests(unittest.TestCase):
         )
 
         self.assertEqual([method.id for method in picked], [entry.id])
+
+    def test_agent_native_import_is_grounded_and_preserves_human_rule(self):
+        evidence = export_evidence(self.s, self.project_id)
+        self.assertEqual(evidence["scan"]["id"], self.scan.id)
+        self.assertIn("OrderService.approveOrder()", {m["fq_name"] for m in evidence["methods"]})
+        result = import_semantic(self.s, self.project_id, {
+            "contract_version": "1.0",
+            "domains": [{"name": "订单", "description": "订单处理", "modules": ["businese/orders"], "confidence": 80}],
+            "objects": [{"name": "订单", "domain": "订单", "description": "订单实体", "source_tables": [], "source_classes": ["OrderService"], "actions": ["审批"], "confidence": 70}],
+            "rules": [{"name": "审批校验", "domain": "订单", "rule_type": "validation", "logic": "校验后批准", "confidence": 90, "source_method": "OrderService.approveOrder()", "evidence": {"file": "OrderService.java", "lines": [2, 2], "snippet": "if (true)"}}],
+            "flows": [{"name": "审批订单", "description": "审批流程", "entry_method": "OrderService.approveOrder()", "business_steps": ["校验", "审批"], "tech_steps": ["Service"], "confidence": 75}],
+            "chain": None,
+            "questions": [],
+        })
+
+        rules = self.s.execute(select(models.BusinessRule).where(
+            models.BusinessRule.scan_id == self.scan.id)).scalars().all()
+        self.assertEqual(result["rules"], 1)
+        self.assertEqual({rule.name for rule in rules}, {"人工确认规则", "审批校验"})
+        imported = next(rule for rule in rules if rule.name == "审批校验")
+        self.assertEqual(imported.model, "agent-native")
+        self.assertEqual(imported.evidence_lines, [2, 2])
+
+    def test_agent_native_rejects_unscanned_evidence_without_mutation(self):
+        invalid = {
+            "contract_version": "1.0", "domains": [], "objects": [], "flows": [],
+            "chain": None, "questions": [],
+            "rules": [{"name": "伪造规则", "rule_type": "other", "logic": "不应入库", "evidence": {"file": "missing.java", "lines": [1, 1]}}],
+        }
+        with self.assertRaises(AgentSemanticError):
+            import_semantic(self.s, self.project_id, invalid)
+        names = set(self.s.execute(select(models.BusinessRule.name).where(
+            models.BusinessRule.scan_id == self.scan.id)).scalars())
+        self.assertEqual(names, {"人工确认规则", "旧 AI 规则"})
 
 
 class ChainEvidenceTests(unittest.TestCase):

@@ -13,7 +13,8 @@
 | `scanner/sqlx.py` | SQL 提取与解析：表×字段×读写 | SQLGlot |
 | `scanner/graph.py` | 图谱落库编排：分片/合并/统计 | SQLAlchemy |
 | `semantics/` | AI 语义层：S1 域 / S2 对象 / S3 规则 / S4 流程 / S6 推演 / 模块规格 / 问答 | LLM + 证据链 |
-| `llm.py` | LLM 适配：OpenAI 兼容 + 缓存 + 成本计数 + mock | httpx |
+| `llm.py` | LLM 适配：OpenAI Compatible / Anthropic Native + 缓存 + 成本计数 + mock | httpx |
+| `semantics/agent_native.py` | 当前 Agent 的证据导出、结构化校验与语义入库 | 无外部模型 |
 | `documents.py` | 6 类交付文档生成（Markdown/Word） | Jinja2/python-docx |
 | `api/` | FastAPI 查询与操作 API | FastAPI |
 | `cli.py` | 命令行入口（所有能力） | click |
@@ -24,7 +25,7 @@
 |---|---|---|
 | Python | ✅ 3.11+ | 运行时 |
 | PostgreSQL 16 | 推荐 | 图谱/业务知识存储；开发可用 SQLite（零配置，单写者限制） |
-| LLM API | ✅ | DeepSeek 或任意 OpenAI 兼容服务（`~/.c2b/config.json` 配置） |
+| LLM API | 可选 | OpenAI Compatible 或 Anthropic Native（云端语义、模块规格、QA） |
 | Node.js | web 形态需要 | 前端构建（18+） |
 | Docker | web 形态需要 | 一键部署（compose） |
 
@@ -39,15 +40,24 @@ cd core && python -m build --wheel   # 产出 core/dist/*.whl
 # 或：cli/build-wheel.sh 一键构建
 ```
 
-## LLM 配置（所有形态共用）
+## 云端 LLM 配置（Web / CLI 可选）
 
 ```json
 // ~/.c2b/config.json
-{ "llm_base_url": "https://api.deepseek.com/v1",
+{ "llm_provider": "openai_compatible",
+  "llm_base_url": "https://api.deepseek.com/v1",
   "llm_api_key": "sk-xxx",
   "llm_model": "deepseek-chat",
   "llm_mode": "api" }        // mock = 不调 API，管线验证用
 ```
+
+`llm_provider` 可选 `openai_compatible`（默认，地址须实现 `/chat/completions`）或
+`anthropic`（原生 Claude Messages API，地址通常为 `https://api.anthropic.com`）。环境变量同样支持
+`C2B_LLM_PROVIDER`、`C2B_LLM_BASE_URL`、`C2B_LLM_API_KEY`、`C2B_LLM_MODEL`。
+
+Agent Skills 不需要配置这份文件来生成首轮业务语义：它使用当前 Agent 读代码，调用
+`export-evidence` 和 `import-semantic` 将带行号证据的结构化结论校验后入库。此路径不替代
+`module-specs` 和 `qa` 的云端模型调用。
 
 安全默认值：LLM 地址只允许公网 HTTPS。连接本机 Ollama 等私网服务时需显式设置
 `C2B_ALLOW_PRIVATE_LLM=1`；这会放宽出站网络边界，只应在可信内网开启。
@@ -77,6 +87,9 @@ projects → scans → modules / code_objects / call_edges / data_tables / sql_o
 c2b scan <目录> --name <项目>      # 扫描：代码 → 代码图谱
 c2b status <project_id>            # 流程状态
 c2b label <project_id> --limit N   # AI 标注：域/对象/规则/流程/推演
+c2b export-evidence <project_id> --output evidence.json  # Agent Native：导出图谱证据
+c2b agent-schema > semantic.json                          # 输出/填写结构化模板
+c2b import-semantic <project_id> --input semantic.json    # 校验行号证据后原子入库
 c2b module-specs <project_id>      # 模块需求规格
 c2b docs <project_id> --type X     # 交付文档（overview/rules/...）
 # 正式文档只纳入人工确认的业务知识；--draft 才包含 AI 未确认项与 AI 主线

@@ -1432,6 +1432,7 @@ def confirmations(pid: int,
 
 
 class LlmSettingsIn(BaseModel):
+    provider: Literal["openai_compatible", "anthropic"] | None = None
     base_url: str | None = Field(default=None, max_length=2048)
     api_key: str | None = Field(default=None, max_length=4096)
     model: str | None = Field(default=None, max_length=200)
@@ -1531,6 +1532,7 @@ def get_llm_settings():
     st = settings_store.load_settings()
     key = st.get("llm_api_key", "")
     return {
+        "provider": st.get("llm_provider"),
         "base_url": st.get("llm_base_url"),
         "model": st.get("llm_model"),
         "mode": st.get("llm_mode"),
@@ -1544,6 +1546,8 @@ def save_llm_settings(body: LlmSettingsIn):
     from .. import settings_store
     from ..security import UnsafeUrlError, validate_outbound_url
     overrides = {}
+    if body.provider is not None:
+        overrides["llm_provider"] = body.provider
     if body.base_url is not None:
         try:
             overrides["llm_base_url"] = validate_outbound_url(
@@ -1571,6 +1575,8 @@ def test_llm_settings(body: LlmSettingsIn | None = None):
     if body:
         if body.base_url:
             kwargs["base_url"] = body.base_url.strip()
+        if body.provider:
+            kwargs["provider"] = body.provider
         if body.api_key:
             kwargs["api_key"] = body.api_key.strip()
         if body.model:

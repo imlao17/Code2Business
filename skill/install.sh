@@ -31,19 +31,20 @@ for skill in c2b-analyze c2b-scan c2b-semantic c2b-docs code2business; do
   echo "  ✓ $skill"
 done
 
-echo "== 3/4 LLM 配置检查 =="
+echo "== 3/4 可选云端 LLM 配置检查 =="
 if [ -f "$C2B_HOME/config.json" ]; then
   echo "  ✓ 已存在（$C2B_HOME/config.json）"
 else
   cat > "$C2B_HOME/config.json" <<'EOF'
 {
+  "llm_provider": "openai_compatible",
   "llm_base_url": "https://api.deepseek.com/v1",
   "llm_api_key": "",
   "llm_model": "deepseek-chat",
   "llm_mode": "api"
 }
 EOF
-  echo "  ⚠️  已创建模板，请编辑 $C2B_HOME/config.json 填入 llm_api_key"
+  echo "  ✓ 已创建可选模板：默认 Agent Native 无需 Key；仅云端 label/module-specs/qa 时填写 $C2B_HOME/config.json"
 fi
 
 echo "== 4/4 PATH 提示 =="

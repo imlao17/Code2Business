@@ -153,6 +153,61 @@ def label(project_id, limit, concurrency, entry_only, no_cache, model):
         s.close()
 
 
+@cli.command("agent-schema")
+def agent_schema():
+    """输出 Agent Native 语义 JSON 模板（无需 API Key）。"""
+    from .semantics.agent_native import AGENT_SEMANTIC_TEMPLATE
+
+    click.echo(json.dumps(AGENT_SEMANTIC_TEMPLATE, ensure_ascii=False, indent=2))
+
+
+@cli.command("export-evidence")
+@click.argument("project_id", type=int)
+@click.option("--output", type=click.Path(dir_okay=False, path_type=Path),
+              required=True, help="导出的图谱证据 JSON 文件")
+@click.option("--max-methods", default=500, show_default=True, type=int,
+              help="导出的方法数上限")
+def export_evidence_command(project_id: int, output: Path, max_methods: int):
+    """导出供当前 Agent 阅读的确定性图谱证据（无需 API Key）。"""
+    from .semantics.agent_native import AgentSemanticError, export_evidence
+
+    init_db()
+    s = SessionLocal()
+    try:
+        evidence = export_evidence(s, project_id, max_methods=max_methods)
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(json.dumps(evidence, ensure_ascii=False, indent=2), encoding="utf-8")
+        click.echo(f"已导出 Agent Native 证据：{output}（{len(evidence['methods'])} 个方法）")
+    except AgentSemanticError as exc:
+        raise click.ClickException(str(exc)) from exc
+    finally:
+        s.close()
+
+
+@cli.command("import-semantic")
+@click.argument("project_id", type=int)
+@click.option("--input", "input_path", type=click.Path(exists=True, dir_okay=False,
+              readable=True, path_type=Path), required=True,
+              help="当前 Agent 生成的语义 JSON 文件")
+def import_semantic_command(project_id: int, input_path: Path):
+    """校验并导入 Agent Native 的业务域、规则、对象、流程和推演。"""
+    from .semantics.agent_native import AgentSemanticError, import_semantic
+
+    try:
+        payload = json.loads(input_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise click.ClickException(f"无法读取语义 JSON: {exc}") from exc
+    init_db()
+    s = SessionLocal()
+    try:
+        result = import_semantic(s, project_id, payload)
+        click.echo(json.dumps(result, ensure_ascii=False, indent=2))
+    except AgentSemanticError as exc:
+        raise click.ClickException(f"未导入：{exc}") from exc
+    finally:
+        s.close()
+
+
 @cli.command()
 @click.argument("project_id", type=int)
 def status(project_id):

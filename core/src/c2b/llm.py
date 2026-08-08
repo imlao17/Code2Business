@@ -1,7 +1,8 @@
-"""LLMClient 适配层：OpenAI 兼容 API + 结构化 JSON 输出 + 重试/缓存/成本计数。
+"""LLMClient 适配层：OpenAI 兼容 / Anthropic 原生 API + JSON 输出。
 
-统一入口，MVP 阶段支持 OpenAI 兼容服务（DeepSeek/OpenAI/Kimi 等），
-预留本地模型（Ollama）切换位。
+统一入口支持 OpenAI-compatible（DeepSeek/OpenAI/Kimi/Ollama/自建网关）和
+Anthropic Messages API。Agent Native 不在这里伪装成 HTTP Provider：它通过
+``c2b export-evidence`` / ``c2b import-semantic`` 将当前 Agent 的结果入库。
 """
 import hashlib
 import json
@@ -25,7 +26,7 @@ try:
 except OSError:
     pass
 
-_PROMPT_CACHE_VERSION = "2026-08-08.1"
+_PROMPT_CACHE_VERSION = "2026-08-08.2"
 _CACHE_LOCK = threading.Lock()
 _USAGE_LOCK = threading.Lock()
 
@@ -52,10 +53,12 @@ def _cache_fingerprint(
     schema: dict | None,
     temperature: float,
     prompt_version: str = _PROMPT_CACHE_VERSION,
+    provider: str = "openai_compatible",
 ) -> str:
     """Build a cache key from every input that can change model output."""
     payload = {
         "version": prompt_version,
+        "provider": provider,
         "base_url": base_url,
         "model": model,
         "system": system,
@@ -156,7 +159,7 @@ def _parse_json_object(content: str) -> dict:
 
 
 class LLMClient:
-    """OpenAI 兼容客户端（api 模式）或内置模拟（mock 模式）。
+    """HTTP LLM 客户端（OpenAI-compatible / Anthropic）或内置模拟。
 
     mock 模式：不调用网络，从代码特征确定性构造输出，用于管线验证。
     """
@@ -164,12 +167,15 @@ class LLMClient:
     def __init__(self, base_url: str | None = None, api_key: str | None = None,
                  model: str | None = None, timeout: float = 300.0,
                  max_retries: int = 3, cache: bool = True,
-                 mode: str | None = None):
+                 mode: str | None = None, provider: str | None = None):
         from . import settings_store
         st = settings_store.load_settings()
         self.mode = mode or st["llm_mode"]
         if self.mode not in {"api", "mock"}:
             raise LLMError(f"未知 LLM 模式: {self.mode}")
+        self.provider = provider or st["llm_provider"]
+        if self.provider not in {"openai_compatible", "anthropic"}:
+            raise LLMError(f"未知 LLM Provider: {self.provider}")
         configured_url = (base_url or st["llm_base_url"]).rstrip("/")
         allow_private = os.environ.get("C2B_ALLOW_PRIVATE_LLM", "").lower() in {
             "1", "true", "yes", "on",
@@ -200,6 +206,78 @@ class LLMClient:
                 "  3) export C2B_LLM_API_KEY=sk-xxx\n"
                 "  4) 临时验证管线可设置 C2B_LLM_MODE=mock 使用内置模拟")
 
+    @staticmethod
+    def _json_hint(schema: dict | None) -> str:
+        """Return a provider-neutral structured-output instruction."""
+        hint = "\n\n请严格以 JSON 对象格式输出，不要包含其他内容。"
+        if schema:
+            hint += ("\n输出 JSON 的字段结构必须严格符合以下定义（字段名不可更改，"
+                     "缺失的字段填空字符串或空数组）：\n"
+                     + json.dumps(schema, ensure_ascii=False)
+                     + "\n注意：直接输出数据本身，不要输出 JSON Schema 定义或描述结构的对象。")
+        return hint
+
+    def _request(self, system: str, user: str, *, temperature: float,
+                 json_mode: bool) -> tuple[str, dict]:
+        """Perform one provider request and normalize text plus usage.
+
+        Anthropic's native API does not require an SDK.  JSON is instructed
+        in the system prompt and validated locally, giving it the same output
+        contract as OpenAI-compatible endpoints without a provider-specific
+        beta feature dependency.
+        """
+        # chat_json has already appended the complete schema instruction to
+        # system; json_mode only selects the compatible-provider response flag.
+        final_system = system
+        if self.provider == "anthropic":
+            payload: dict[str, Any] = {
+                "model": self.model,
+                "max_tokens": 8192,
+                "system": final_system,
+                "messages": [{"role": "user", "content": user}],
+                "temperature": temperature,
+            }
+            headers = {
+                "x-api-key": self.api_key,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            }
+            endpoint = f"{self.base_url}/v1/messages"
+        else:
+            messages = [{"role": "system", "content": final_system}]
+            if user:
+                messages.append({"role": "user", "content": user})
+            payload = {"model": self.model, "messages": messages,
+                       "temperature": temperature}
+            if json_mode:
+                payload["response_format"] = {"type": "json_object"}
+            headers = {"Authorization": f"Bearer {self.api_key}",
+                       "Content-Type": "application/json"}
+            endpoint = f"{self.base_url}/chat/completions"
+        with httpx.Client(timeout=self.timeout, follow_redirects=False,
+                          trust_env=False) as http:
+            resp = http.post(endpoint, headers=headers, json=payload)
+        if resp.status_code != 200:
+            raise LLMError(f"HTTP {resp.status_code}: {resp.text[:300]}")
+        data = resp.json()
+        if self.provider == "anthropic":
+            blocks = data["content"]
+            content = "".join(
+                block.get("text", "") for block in blocks
+                if isinstance(block, dict) and block.get("type") == "text"
+            )
+            if not content:
+                raise LLMError("Anthropic 返回中不包含文本内容")
+            usage = data.get("usage", {})
+            normalized_usage = {
+                "prompt_tokens": usage.get("input_tokens", 0),
+                "completion_tokens": usage.get("output_tokens", 0),
+            }
+        else:
+            content = data["choices"][0]["message"]["content"]
+            normalized_usage = data.get("usage", {})
+        return content, normalized_usage
+
     def chat_json(self, system: str, user: str,
                   schema: dict | None = None, temperature: float = 0.2) -> dict:
         """结构化 JSON 输出（带缓存与重试）。返回 dict；失败抛 LLMError。"""
@@ -208,6 +286,7 @@ class LLMClient:
             _validate_json_schema(result, schema)
             return result
         key = _cache_fingerprint(
+            provider=self.provider,
             base_url=self.base_url,
             model=self.model,
             system=system,
@@ -228,43 +307,15 @@ class LLMClient:
                     except OSError:
                         pass
 
-        # json_object 模式：需在提示中显式给出 JSON 结构（DeepSeek/OpenAI 兼容）
-        json_hint = "\n\n请严格以 JSON 对象格式输出，不要包含其他内容。"
-        if schema:
-            json_hint += ("\n输出 JSON 的字段结构必须严格符合以下定义（字段名不可更改，"
-                          "缺失的字段填空字符串或空数组）：\n"
-                          + json.dumps(schema, ensure_ascii=False)
-                          + "\n注意：直接输出数据本身，不要输出 JSON Schema 定义或描述结构的对象。")
-        messages = [
-            {"role": "system", "content": system + json_hint},
-        ]
-        if user:
-            messages.append({"role": "user", "content": user})
-
-        payload: dict[str, Any] = {
-            "model": self.model,
-            "messages": messages,
-            "temperature": temperature,
-            "response_format": {"type": "json_object"},
-        }
+        # Keep the full schema in the prompt for both providers.  Compatible
+        # providers also receive response_format=json_object via _request.
+        prompted_system = system + self._json_hint(schema)
 
         last_err: Exception | None = None
         for attempt in range(self.max_retries):
             try:
-                with httpx.Client(
-                    timeout=self.timeout, follow_redirects=False, trust_env=False
-                ) as http:
-                    resp = http.post(
-                        f"{self.base_url}/chat/completions",
-                        headers={"Authorization": f"Bearer {self.api_key}",
-                                 "Content-Type": "application/json"},
-                        json=payload,
-                    )
-                if resp.status_code != 200:
-                    raise LLMError(f"HTTP {resp.status_code}: {resp.text[:300]}")
-                data = resp.json()
-                content = data["choices"][0]["message"]["content"]
-                usage = data.get("usage", {})
+                content, usage = self._request(
+                    prompted_system, user, temperature=temperature, json_mode=True)
                 _record_usage(
                     requests=1,
                     prompt=usage.get("prompt_tokens", 0),
@@ -298,32 +349,17 @@ class LLMClient:
         """非结构化文本输出。"""
         if self.mode == "mock":
             return self._mock_text(system, user)
-        payload = {"model": self.model,
-                   "messages": [{"role": "system", "content": system},
-                                {"role": "user", "content": user}],
-                   "temperature": temperature}
         last_err: Exception | None = None
         for attempt in range(self.max_retries):
             try:
-                with httpx.Client(
-                    timeout=self.timeout, follow_redirects=False, trust_env=False
-                ) as http:
-                    resp = http.post(
-                        f"{self.base_url}/chat/completions",
-                        headers={"Authorization": f"Bearer {self.api_key}",
-                                 "Content-Type": "application/json"},
-                        json=payload,
-                    )
-                if resp.status_code != 200:
-                    raise LLMError(f"HTTP {resp.status_code}: {resp.text[:300]}")
-                data = resp.json()
-                usage = data.get("usage", {})
+                content, usage = self._request(
+                    system, user, temperature=temperature, json_mode=False)
                 _record_usage(
                     requests=1,
                     prompt=usage.get("prompt_tokens", 0),
                     completion=usage.get("completion_tokens", 0),
                 )
-                return data["choices"][0]["message"]["content"]
+                return content
             except (httpx.HTTPError, LLMError, KeyError, IndexError, TypeError) as e:
                 last_err = e
                 _record_usage(failed=1)

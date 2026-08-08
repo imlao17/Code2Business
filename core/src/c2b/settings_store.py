@@ -13,6 +13,9 @@ CONFIG_FILE = CONFIG_DIR / "config.json"
 _WRITE_LOCK = threading.Lock()
 
 _DEFAULTS = {
+    # OpenAI-compatible is the backwards-compatible default.  Existing
+    # ~/.c2b/config.json files gain this field automatically on load.
+    "llm_provider": "openai_compatible",
     "llm_base_url": "https://api.deepseek.com/v1",
     "llm_api_key": "",
     "llm_model": "deepseek-chat",
@@ -45,6 +48,8 @@ def load_settings() -> dict:
     # 环境变量优先
     if os.environ.get("C2B_LLM_BASE_URL"):
         merged["llm_base_url"] = os.environ["C2B_LLM_BASE_URL"]
+    if os.environ.get("C2B_LLM_PROVIDER"):
+        merged["llm_provider"] = os.environ["C2B_LLM_PROVIDER"]
     if os.environ.get("C2B_LLM_API_KEY"):
         merged["llm_api_key"] = os.environ["C2B_LLM_API_KEY"]
     if os.environ.get("C2B_LLM_MODEL"):

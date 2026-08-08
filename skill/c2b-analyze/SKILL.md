@@ -1,6 +1,6 @@
 ---
 name: c2b-analyze
-description: Code2Business 遗留系统业务知识还原（完整版）主入口。当用户要求"分析这个代码库""还原业务""生成需求规格""重构前梳理""系统盘点"，或给出代码目录/Git 地址要求产出业务文档时使用。本技能编排完整流程：扫描（c2b-scan）→ AI 语义标注（c2b-semantic）→ 交付文档（c2b-docs），产出与 Code2Business 网页端相同的成果（模块图谱/业务对象/规则卡片/模块需求规格/交付文档）。依赖 c2b Python 包与 DeepSeek API。触发词：代码分析、业务还原、需求规格、系统盘点、重构前、逆向、遗留系统。
+description: Code2Business 遗留系统业务知识还原（完整版）主入口。当用户要求"分析这个代码库""还原业务""生成需求规格""重构前梳理""系统盘点"，或给出代码目录/Git 地址要求产出业务文档时使用。本技能编排完整流程：扫描（c2b-scan）→ 当前 Agent 语义标注（c2b-semantic）→ 交付文档（c2b-docs）。默认不需要外部模型 Key；云端 Provider 是可选路径。触发词：代码分析、业务还原、需求规格、系统盘点、重构前、逆向、遗留系统。
 ---
 
 # Code2Business 完整流程（主入口）
@@ -12,7 +12,7 @@ description: Code2Business 遗留系统业务知识还原（完整版）主入�
 1. 确认 c2b 已安装：`c2b --help`（若失败：
    - 若本机由 install.sh 安装过：先 `export PATH="$HOME/.c2b/venv/bin:$PATH"`
    - 否则见 skill/README.md 或执行 skill/install.sh）
-2. 确认 LLM 配置：`ls ~/.c2b/config.json` 且含 api_key（无则提示用户配置）
+2. 默认不检查 LLM Key：语义阶段使用当前 Agent 的模型。只有用户要求模块规格、QA 或无人值守云端 `label` 时，才检查 `~/.c2b/config.json` 的 Provider 配置。
 3. 确认数据库可用：`c2b init`（与网页共用同一 C2B_DB_URL）
 
 ## 阶段一：扫描（调用 c2b-scan）
@@ -29,12 +29,15 @@ c2b scan <代码根目录或仓库路径> --name <项目名>
 ## 阶段二：语义标注（调用 c2b-semantic）
 
 ```bash
-c2b label <project_id> --limit 100        # 域/对象/规则/流程/推演（可调大 limit）
-c2b module-specs <project_id>             # 全部模块需求规格（130 个约 1 小时，可 --name 指定）
+c2b export-evidence <project_id> --output c2b-evidence.json
+c2b agent-schema > c2b-semantic-result.json
+# 当前 Agent 阅读源码和证据，按模板写入 c2b-semantic-result.json
+c2b import-semantic <project_id> --input c2b-semantic-result.json
+# 可选云端增强（需配置 Provider）：c2b module-specs <project_id>
 ```
 
-- 展示标注统计（规则数/对象数/流程数/推演）
-- 询问用户是否要全量标注（--limit 400+）或模块规格全部分析
+- 展示导入统计（规则数/对象数/流程数/推演）与待确认项；每条规则必须带扫描内的代码证据。
+- 只有用户要求无人值守批量标注时，使用 `c2b label <project_id> --limit 400+`；只有用户要求模块规格时，检查云端 Provider 后执行 `c2b module-specs`。
 
 ## 阶段三：交付（调用 c2b-docs）
 

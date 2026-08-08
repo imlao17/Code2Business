@@ -14,7 +14,7 @@
 
 首次启动后：
 1. 打开 http://localhost:8080
-2. 右上角「LLM 设置」填入 DeepSeek Key（保存后即生效）
+2. 右上角「LLM 设置」选择 OpenAI Compatible（含 DeepSeek/OpenAI/自建兼容端）或 Anthropic Native（Claude），填入对应地址、模型和 Key（保存后即生效）
 
 ## 独立分发（离线部署到目标机器）
 

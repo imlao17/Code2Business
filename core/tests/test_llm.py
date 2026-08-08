@@ -1,4 +1,7 @@
 import unittest
+import tempfile
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 
 class LlmContractTests(unittest.TestCase):
@@ -57,6 +60,39 @@ class LlmContractTests(unittest.TestCase):
             ),
         ]
         self.assertEqual(len({first, *variants}), 4)
+        anthropic = _cache_fingerprint(
+            base_url="https://one.example/v1", schema={"type": "object"},
+            temperature=0.1, provider="anthropic", **common,
+        )
+        self.assertNotEqual(first, anthropic)
+
+    def test_anthropic_messages_request_and_usage_are_normalized(self):
+        from c2b.llm import LLMClient
+
+        response = MagicMock(status_code=200)
+        response.json.return_value = {
+            "content": [{"type": "text", "text": '{"ok": true}'}],
+            "usage": {"input_tokens": 12, "output_tokens": 4},
+        }
+        http = MagicMock()
+        http.__enter__.return_value = http
+        http.__exit__.return_value = False
+        http.post.return_value = response
+        with patch("c2b.llm.validate_outbound_url", return_value="https://api.anthropic.com"), \
+                patch("c2b.llm.httpx.Client", return_value=http):
+            result = LLMClient(
+                provider="anthropic", mode="api", cache=False, max_retries=1,
+                base_url="https://api.anthropic.com", api_key="test-key", model="claude-test",
+            ).chat_json("system", "user", {"type": "object"})
+
+        self.assertEqual(result, {"ok": True})
+        url = http.post.call_args.args[0]
+        kwargs = http.post.call_args.kwargs
+        self.assertEqual(url, "https://api.anthropic.com/v1/messages")
+        self.assertEqual(kwargs["headers"]["x-api-key"], "test-key")
+        self.assertEqual(kwargs["headers"]["anthropic-version"], "2023-06-01")
+        self.assertEqual(kwargs["json"]["messages"], [{"role": "user", "content": "user"}])
+        self.assertEqual(kwargs["json"]["max_tokens"], 8192)
 
     def test_api_mode_rejects_private_llm_endpoint(self):
         from c2b.llm import LLMClient, LLMError
@@ -67,6 +103,17 @@ class LlmContractTests(unittest.TestCase):
                 base_url="http://127.0.0.1:11434/v1",
                 api_key="test",
             )
+
+    def test_existing_settings_default_to_compatible_provider(self):
+        from c2b import settings_store
+
+        with tempfile.TemporaryDirectory() as tmp:
+            config_dir = Path(tmp) / ".c2b"
+            with patch.object(settings_store, "CONFIG_DIR", config_dir), \
+                    patch.object(settings_store, "CONFIG_FILE", config_dir / "config.json"):
+                self.assertEqual(settings_store.load_settings()["llm_provider"], "openai_compatible")
+                settings_store.save_settings({"llm_provider": "anthropic"})
+                self.assertEqual(settings_store.load_settings()["llm_provider"], "anthropic")
 
 
 if __name__ == "__main__":

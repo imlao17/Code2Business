@@ -101,8 +101,16 @@
               <el-radio value="mock">Mock（模拟）</el-radio>
             </el-radio-group>
           </el-form-item>
+          <el-form-item v-if="llmForm.mode === 'api'" label="Provider">
+            <el-select v-model="llmForm.provider" style="width: 100%">
+              <el-option label="OpenAI Compatible（OpenAI / DeepSeek / 自定义兼容端）"
+                         value="openai_compatible" />
+              <el-option label="Anthropic Native（Claude 原生 API）" value="anthropic" />
+            </el-select>
+            <div class="form-hint">{{ providerHint }}</div>
+          </el-form-item>
           <el-form-item label="API 地址">
-            <el-input v-model="llmForm.base_url" placeholder="https://api.deepseek.com/v1" />
+            <el-input v-model="llmForm.base_url" :placeholder="providerUrlPlaceholder" />
           </el-form-item>
           <el-form-item label="API Key">
             <el-input v-model="llmForm.api_key" type="password" show-password
@@ -144,8 +152,8 @@ const importForm = reactive({ name: '', source: 'zip', gitUrl: '' })
 let zipFile = null
 let importTimer = null
 let importContext = null
-const llm = reactive({ mode: 'api', has_key: false, key_masked: '' })
-const llmForm = reactive({ mode: 'api', base_url: '', api_key: '', model: '' })
+const llm = reactive({ provider: 'openai_compatible', mode: 'api', has_key: false, key_masked: '' })
+const llmForm = reactive({ provider: 'openai_compatible', mode: 'api', base_url: '', api_key: '', model: '' })
 const pipeline = ref({ steps: [], next: null })
 const activeStep = ref(0)
 let pipelineTimer = null
@@ -155,6 +163,12 @@ let pipelineLoadToken = 0
 
 const hasRunningPipeline = computed(() =>
   pipeline.value.steps.some(st => st.status === 'running'))
+const providerUrlPlaceholder = computed(() => llmForm.provider === 'anthropic'
+  ? 'https://api.anthropic.com'
+  : 'https://api.deepseek.com/v1')
+const providerHint = computed(() => llmForm.provider === 'anthropic'
+  ? '使用 Claude 原生 Messages API；填写 Anthropic API Key。'
+  : '适用于 OpenAI、DeepSeek、Kimi、Ollama 及遵循 /chat/completions 的自建服务。')
 
 const stepStatus = st => ({
   done: 'success', running: 'process', pending: 'wait', ready: 'wait'
@@ -338,12 +352,13 @@ async function loadProjects() {
 }
 async function loadLlm() {
   Object.assign(llm, (await api.get('/settings/llm')).data)
+  llmForm.provider = llm.provider || 'openai_compatible'
   llmForm.mode = llm.mode
-  llmForm.base_url = llm.base_url || 'https://api.deepseek.com/v1'
-  llmForm.model = llm.model || 'deepseek-chat'
+  llmForm.base_url = llm.base_url || providerUrlPlaceholder.value
+  llmForm.model = llm.model || (llmForm.provider === 'anthropic' ? '' : 'deepseek-chat')
 }
 async function saveLlm() {
-  const body = { mode: llmForm.mode, base_url: llmForm.base_url, model: llmForm.model }
+  const body = { provider: llmForm.provider, mode: llmForm.mode, base_url: llmForm.base_url, model: llmForm.model }
   if (llmForm.api_key) body.api_key = llmForm.api_key
   await api.post('/settings/llm', body)
   ElMessage.success('配置已保存')
@@ -353,7 +368,7 @@ async function saveLlm() {
 async function testLlm() {
   testing.value = true
   try {
-    const body = { mode: llmForm.mode, base_url: llmForm.base_url, model: llmForm.model }
+    const body = { provider: llmForm.provider, mode: llmForm.mode, base_url: llmForm.base_url, model: llmForm.model }
     if (llmForm.api_key) body.api_key = llmForm.api_key
     const r = (await api.post('/settings/llm/test', body, {
       timeout: LONG_REQUEST_TIMEOUT

@@ -22,7 +22,7 @@ Code2Business 把旧系统代码转换为可追溯、可确认、可交付的业
 | 产品 | 适合谁 | 解决的问题 | 独立运行条件 | 入口 |
 |---|---|---|---|---|
 | **① C2B Web 工作台** | 产品经理、业务分析师、交付顾问、客户演示人员 | 可视化查看代码/业务图谱、人工确认、协作评审、导出交付材料 | Docker；离线目标机只需 Docker | [web/README.md](web/README.md) |
-| **② C2B CLI** | 开发、架构、运维、CI/批处理使用者 | 在服务器或脚本中批量扫描、生成规格、导出文档、接入自动化 | Python 3.11+；可选 PostgreSQL；LLM 仅语义阶段需要 | [cli/README.md](cli/README.md) |
+| **② C2B CLI** | 开发、架构、运维、CI/批处理使用者 | 在服务器或脚本中批量扫描、生成规格、导出文档、接入自动化 | Python 3.11+；可选 PostgreSQL；语义可选外部 LLM 或 Agent Native 导入 | [cli/README.md](cli/README.md) |
 | **③ C2B Agent Skills** | 使用 Claude Code、Codex、opencode 等 Agent 的团队 | 用自然语言编排扫描、语义分析和文档交付，保留每阶段过程与证据 | Python 3.11+、pip、兼容的 Agent 宿主 | [skill/README.md](skill/README.md) |
 
 `core/` 是三种产品共用的实现和运行时，不是第四个面向用户的部署产品。Web 镜像、CLI wheel 和 Agent Skill 都会携带或安装它。
@@ -68,16 +68,17 @@ Web 也支持完全离线交付：构建机执行 `./build-dist.sh`，目标机�
 ./cli/build-wheel.sh
 python3 -m pip install cli/dist/c2b-*.whl
 
-# 配置 LLM 后初始化数据库，再跑完整流程
+# 初始化数据库后先完成确定性扫描
 c2b init
 c2b scan /path/to/legacy-code --name legacy-system
+# 任选其一：配置 Provider 后运行 label，或交由当前 Agent 生成并导入语义 JSON
 c2b label 1 --limit 200
 c2b module-specs 1
 c2b docs 1 --type overview --output 系统现状说明书.md
 c2b docs 1 --type rules --output 业务规则清单.md
 ```
 
-CLI 的确定性扫描可独立完成；`label`、模块规格、QA 等语义功能才需要配置 OpenAI 兼容的 LLM。完整命令、配置和 CI 使用方式见 [CLI 说明](cli/README.md)。
+CLI 的确定性扫描可独立完成。云端语义功能支持 OpenAI Compatible 与 Anthropic 原生 API；若正通过 Codex、Claude Code 等 Agent 工作，可用 Agent Native 的证据导出/结构化导入完成业务域、对象、规则和流程，不需在 C2B 中再配置外部模型 Key。模块规格和 QA 仍是独立 LLM 能力。完整命令、配置和 CI 使用方式见 [CLI 说明](cli/README.md)。
 
 ### ③ C2B Agent Skills：面向自然语言编排
 
@@ -95,7 +96,7 @@ export PATH="$HOME/.c2b/venv/bin:$PATH"
 用 c2b 分析 /path/to/legacy-code，先给我规模报告，再生成业务规则和系统现状说明书。
 ```
 
-技能会按“扫描 → 业务语义 → 文档交付”的顺序编排工作。对于中小仓库，还可使用零依赖参考版进行规模探测和辅助分析。完整安装方式、宿主要求和使用边界见 [Agent Skills 说明](skill/README.md)。
+技能默认让当前 Agent 通过“扫描证据 → 结构化业务结论 → 校验入库”完成语义阶段，不会要求重复配置外部模型 Key；如需无人值守批量运行，也可显式改用云端 Provider。对于中小仓库，还可使用零依赖参考版进行规模探测和辅助分析。完整安装方式、宿主要求和使用边界见 [Agent Skills 说明](skill/README.md)。
 
 ## 共同工作原理
 
@@ -111,7 +112,7 @@ flowchart LR
 ```
 
 - **代码证据优先**：每条规则和结论都尽量关联文件、行号、表或调用链；
-- **AI 只做语义归纳**：AI 结果先进入待确认知识，而不是直接成为正式结论；
+- **AI / Agent 只做语义归纳**：云端模型或当前 Agent 的结果先进入待确认知识，而不是直接成为正式结论；
 - **正式/草稿分离**：正式文档只纳入人工确认的业务知识；草稿才包含未确认 AI 项和业务主线；
 - **项目隔离**：项目、扫描、规则、问答、模块规格和确认记录均按项目边界保存；
 - **可追溯**：规则确认、修改、废弃都会留下审计记录。

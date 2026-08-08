@@ -19,7 +19,7 @@
 cd web/deploy
 ./up.sh                       # 构建前端 + core wheel + 后端镜像 + 启动（PG + API + 前端）
 # 打开 http://localhost:8080
-# 右上角「LLM 设置」填入 OpenAI 兼容 LLM 的地址、模型和 Key
+# 右上角「LLM 设置」选择 OpenAI Compatible（含自建兼容端）或 Anthropic Native，填入地址、模型和 Key
 ```
 
 停止：`./down.sh`（数据保留在 volume）。
@@ -67,6 +67,15 @@ cd frontend && pnpm install --frozen-lockfile && pnpm dev --host 127.0.0.1
 正式文档只纳入人工确认的业务知识；在内部评审阶段可切换为草稿，查看 AI 未确认项和业务主线。
 
 顶部流程引导条实时显示当前进度与下一步。
+
+## 模型 Provider
+
+Web 工作台的后台任务没有“当前 Agent 会话”，因此只提供可由服务端稳定调用的云端 Provider：
+
+- **OpenAI Compatible**：适用于 OpenAI、DeepSeek、Kimi、Ollama 和自建网关；自定义地址必须实现 `POST /chat/completions` 协议。
+- **Anthropic Native**：适用于 Claude 原生 Messages API，地址通常为 `https://api.anthropic.com`。
+
+两种 Provider 都会经由相同的超时、重试、缓存、JSON 校验和出站 URL 安全限制。Web 不会自动猜测任意自定义 API 的协议；请按实际协议选择 Provider。
 
 ## 页面
 

@@ -24,7 +24,7 @@ cd skill && ./install.sh [目标skills目录]   # 默认 ~/.agents/skills
 # install.sh 自动完成：
 #   1. 创建 ~/.c2b/venv 并安装自带 vendor/*.whl（c2b CLI 运行时）
 #   2. 复制 4 个运行时技能 + 1 个零依赖参考包到目标目录
-#   3. 生成 LLM 配置模板 ~/.c2b/config.json（填入 Key）
+#   3. 生成可选的 LLM 配置模板 ~/.c2b/config.json（仅云端增强功能需要 Key）
 #   4. 提示把 venv 加入 PATH
 ```
 
@@ -58,6 +58,16 @@ c2b-analyze 自动执行三个阶段，每阶段汇报进度：
 ③ c2b-docs     → 交付文档 + 完成报告
 ```
 
+### 默认模型：当前 Agent（无需外部 Key）
+
+`c2b-semantic` 默认采用 **Agent Native**：它先导出确定性代码图谱证据，随后由正在工作的
+Codex、Claude Code 或其他兼容 Agent 结合源码生成结构化结果，再通过 `c2b import-semantic`
+校验文件、行号和方法后入库。因此不需要为 C2B 额外配置 OpenAI、Claude 或其他 API Key。
+
+这不是让 Agent 绕过证据直接写数据库：规则若不引用本次扫描中的方法和行号，整个导入会被拒绝。
+已人工确认或修改的内容不会被覆盖。模块规格和图谱问答是单独的云端 LLM 功能；如需它们，再配置
+OpenAI Compatible 或 Anthropic Native Provider。
+
 一个完整请求示例：
 
 ```text
@@ -79,7 +89,7 @@ c2b-analyze 自动执行三个阶段，每阶段汇报进度：
 | Python 3.11+ | 运行时 | 目标机器 |
 | c2b wheel（vendor/ 内置） | c2b 应用本体 | install.sh 自动 |
 | Python 第三方包 | 扫描/API/文档等运行时依赖 | pip 从 PyPI 或指定镜像安装 |
-| LLM API | DeepSeek 等 | ~/.c2b/config.json |
+| LLM API | 可选：模块规格/问答或无人值守 `label` | ~/.c2b/config.json |
 | Agent 工具 | Claude Code / opencode | 宿主 |
 
 ## 哪些情况选它，哪些情况不选它？
