@@ -1,0 +1,39 @@
+# --- 敏感与私有数据（禁止推送） ---
+# 验证样本为私有客户代码，绝不提交
+n-s-modernization-origin-main/
+
+# LLM 配置与密钥
+.c2b/
+*.key
+.env
+
+# 运行时数据与缓存
+c2b-data/
+c2b.db
+*.db
+.llm_cache/
+postgresql+psycopg:/
+
+# --- Python ---
+__pycache__/
+*.pyc
+.venv/
+venv/
+build/
+dist/*.egg-info/
+*.egg-info/
+
+# --- 前端 ---
+node_modules/
+web/frontend/dist/
+core/dist/
+cli/dist/
+web/deploy/dist/
+web/deploy/frontend-dist/
+web/deploy/*.tar.gz
+
+# --- 系统/IDE ---
+.DS_Store
+.idea/
+.vscode/
+.omx/

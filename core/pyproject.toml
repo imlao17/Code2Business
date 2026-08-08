@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "c2b"
+version = "0.1.0"
+description = "Code2Business - 遗留系统业务知识还原平台（MVP）"
+requires-python = ">=3.11"
+dependencies = [
+    "tree-sitter>=0.24",
+    "tree-sitter-java>=0.23",
+    "sqlglot>=25",
+    "sqlalchemy>=2.0",
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "click>=8.1",
+    "pyyaml>=6.0",
+    "pydantic>=2.0",
+    "psycopg[binary]>=3.1",
+    "python-multipart>=0.0.9",
+    "jinja2>=3.1",
+    "python-docx>=1.1",
+    "openpyxl>=3.1",
+    "httpx>=0.27",
+]
+
+[project.scripts]
+c2b = "c2b.cli:cli"
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -1,0 +1,50 @@
+# Code2Business 一键部署（docker compose up -d）
+# 访问 http://localhost:8080 打开网页工作台
+# 数据卷：c2b_pgdata（数据库）、c2b_data（上传的代码仓库）
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: c2b
+      POSTGRES_USER: c2b
+      POSTGRES_PASSWORD: c2b_secret
+    volumes:
+      - c2b_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U c2b"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    image: c2b-api:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      C2B_DB_URL: postgresql+psycopg://c2b:c2b_secret@postgres:5432/c2b
+      C2B_DATA_ROOT: /data
+    volumes:
+      - c2b_data:/data/projects
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    image: nginx:alpine
+    volumes:
+      - ./frontend-dist:/usr/share/nginx/html:ro
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      # Safe default: local workstation only.  Remote deployments should put
+      # an authenticated reverse proxy in front and opt into a public bind.
+      - "127.0.0.1:8080:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  c2b_pgdata:
+  c2b_data:

@@ -1,0 +1,96 @@
+# C2B Web 工作台（产品①）
+
+这是面向业务协作和交付演示的独立 Web 产品：项目导入、扫描、AI 标注、业务图谱、模块需求规格、业务推演、人工确认、AI 问答与文档导出都在浏览器内完成。
+
+**它解决什么问题？** 当遗留系统的知识只在代码和少数开发人员脑中，而产品、实施或客户需要看得懂、能核实、可下载的业务材料时，使用 Web 工作台。
+
+它可以独立部署，**不需要额外安装 CLI 或 Agent Skills**。Docker 部署包会自行构建和运行后端、数据库及前端；CLI/Skill 只是可选的自动化入口。三种产品的选择方式见根目录 [README](../README.md)。
+
+## 适用场景
+
+- 产品经理或实施顾问需要快速理解并展示遗留系统；
+- 业务方需要逐条确认、修改或废弃 AI 识别出的规则；
+- 项目需要输出系统现状、功能清单、规则清单、数据字典、接口清单和验收材料；
+- 客户现场或内网环境希望一套浏览器可访问的私有化工作台。
+
+## 快速部署（Docker 一键）
+
+```bash
+cd web/deploy
+./up.sh                       # 构建前端 + core wheel + 后端镜像 + 启动（PG + API + 前端）
+# 打开 http://localhost:8080
+# 右上角「LLM 设置」填入 OpenAI 兼容 LLM 的地址、模型和 Key
+```
+
+停止：`./down.sh`（数据保留在 volume）。
+
+### 独立分发（离线部署）
+
+```bash
+./build-dist.sh               # 产出离线包 c2b-web-deploy.tar.gz
+# 目标机器（仅 Docker）：
+tar xzf c2b-web-deploy.tar.gz
+cd c2b-web-deploy
+shasum -a 256 -c MANIFEST.sha256    # Linux 可改用 sha256sum -c
+docker load < c2b-web-images.tar.gz
+docker compose up -d
+```
+
+离线包内已包含：
+- `frontend-dist/` 静态站点
+- `dist/c2b-*.whl` API 安装包
+- `c2b-web-images.tar.gz` 运行时镜像包（API + PostgreSQL + nginx）
+- `docker-compose.yml` / `Dockerfile` / `nginx/`
+- `MANIFEST.sha256` 校验清单
+
+## 本地开发
+
+```bash
+# 后端（依赖 core/）
+pip install -e ../core
+export C2B_DB_URL="postgresql+psycopg://user:pass@localhost:5432/c2b"
+uvicorn c2b.api.main:app --port 8123
+
+# 前端
+cd frontend && pnpm install --frozen-lockfile && pnpm dev --host 127.0.0.1
+# http://localhost:5173
+```
+
+## 使用流程（网页内完成全流程）
+
+1. **新建项目**：上传 zip 代码包 或 Git 地址 → 自动扫描（进度条）
+2. **运行标注**：AI 识别业务域/对象/规则/流程/推演（异步 + 进度）
+3. **模块需求规格**：批量分析全部模块 → 查看/下载/打包
+4. **人工确认**：规则页逐条/批量确认、修改或废弃；处理待确认项
+5. **导出**：下载 6 类交付文档、模块规格 ZIP 和规则 Excel
+
+正式文档只纳入人工确认的业务知识；在内部评审阶段可切换为草稿，查看 AI 未确认项和业务主线。
+
+顶部流程引导条实时显示当前进度与下一步。
+
+## 页面
+
+| 页面 | 功能 |
+|---|---|
+| 项目总览 | 统计看板、模块 Top、规则分布、可信度分布 |
+| 模块需求规格 | 搜索/批量/单模块分析、规格查看、zip 打包 |
+| 业务对象与流程 | 对象（表/动作）、流程步骤 |
+| 业务推演 | 驱动关系图（V1-V4 证据等级；V0 移入推断假设）、主线、设计叙事 |
+| 流程与规则 | 规则卡片、筛选、确认/废弃、批量确认、Excel 导出 |
+| 数据与接口 | 数据表、SQL 读写场景 |
+| 待确认项 | 待处理清单、标记解决 |
+| 文档与验收 | 6 类交付文档、模块规格下载 |
+| AI 问答 | 全局浮窗、历史持久化 |
+
+## 与 CLI / Agent Skills 共享数据（可选）
+
+Web 默认使用自己的 PostgreSQL 数据卷，因此可以完全独立运行。若希望 CLI 或 Agent Skill 的扫描结果也显示在工作台中，请让三者使用同一个共享 PostgreSQL 地址；默认 compose 内置的 PostgreSQL 不向宿主机暴露端口，跨产品共用时建议使用单独托管的 PostgreSQL，或由维护者显式配置受保护的数据库网络。这是一种可选集成，不是部署前置条件。
+
+## 目录
+
+```
+web/
+├── frontend/         # Vue3 + Element Plus + ECharts
+└── deploy/           # Dockerfile / compose / nginx / up.sh / down.sh / build-dist.sh
+                    # 运行时会生成 frontend-dist/ 与 dist/ 作为自包含构建产物
+```
