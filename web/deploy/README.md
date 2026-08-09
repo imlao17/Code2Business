@@ -1,9 +1,13 @@
 # Code2Business 网页端部署（形态①）
 
+> 当前部署包版本：v0.2.0。版本变化见[仓库变更日志](../../CHANGELOG.md)。
+
 一键启动：PG + API + 前端（nginx），浏览器打开 http://localhost:8080。
 默认只监听 `127.0.0.1`，不会直接暴露到局域网或公网。
 
 这是 C2B 的 **Web 工作台产品**，可单独部署；不要求同时安装 C2B CLI 或 Agent Skills。它适合在浏览器中导入代码、查看业务图谱、人工确认规则和下载交付文档。三种产品的定位和选择方式见根目录 [README](../../README.md)。
+
+**本部署包的当前定位是本机单团队试点**：默认监听 `127.0.0.1`，系统本身不包含登录、角色权限或客户级数据隔离。只在本机或可信内网使用时可直接启动；若交给多人或通过公网访问，必须先在外部反向代理提供 HTTPS、身份认证和访问控制，且不要将不同客户项目混放在同一个未隔离实例。
 
 ## 快速开始
 
@@ -11,6 +15,9 @@
 ./up.sh      # 构建前端 + core wheel + 后端镜像 + 启动全套
 ./down.sh    # 停止（数据保留在 volume）
 ```
+
+首次执行 `./up.sh` 会从 `.env.example` 创建权限为 `600` 的 `.env`，并生成一个
+URL-safe 的 PostgreSQL 密码。部署者应备份该 `.env`；它不是可提交的项目文件。
 
 首次启动后：
 1. 打开 http://localhost:8080
@@ -26,6 +33,9 @@
 ```bash
 tar xzf c2b-web-deploy.tar.gz
 cd c2b-web-deploy
+cp .env.example .env
+# 编辑 .env：至少替换 C2B_POSTGRES_PASSWORD；远程部署还应设置 C2B_API_TOKEN
+chmod 600 .env
 shasum -a 256 -c MANIFEST.sha256    # Linux 可改用 sha256sum -c
 docker load < c2b-web-images.tar.gz
 docker compose up -d
@@ -58,6 +68,7 @@ docker compose up -d
 
 - `c2b_pgdata`：PostgreSQL 数据卷（图谱/业务知识）
 - `c2b_data`：上传的代码仓库（挂载到容器 /data/projects）
+- `c2b_settings`：Web 保存的 Provider、Base URL、模型名和 Key（挂载到 `/root/.c2b`，API 容器重建后仍保留）
 - `docker compose down` 不删卷；彻底清理：`docker compose down -v`
 
 ## 常用运维
@@ -68,13 +79,23 @@ docker compose ps                 # 服务状态
 docker compose restart api        # 重启 API
 ```
 
-## 自定义
+当前 MVP 的扫描、标注和模块规格任务在 API 进程内执行。API 重启时，正在执行的
+线程无法继续运行；启动后系统会把这些任务标记为失败，并给出“请重新运行”的原因，
+不会让项目永久停留在“运行中”。运行中的任务会按 `.env` 的
+`C2B_JOB_LEASE_SECONDS` 定期刷新租约；超过该时长没有心跳的旧任务也会在下一次
+项目任务启动时被释放。
 
-- LLM 模型/地址：网页「LLM 设置」随时改（存容器 ~/.c2b/config.json）
-- 数据库地址：修改 compose 中 `C2B_DB_URL` 环境变量
+## 配置与内网模型
+
+- 复制 `.env.example` 为 `.env` 后配置数据库密码、Web 监听地址、API Token 与安全开关。`.env` 已被 Git 忽略，不要提交。
+- LLM 模型/地址：网页「LLM 设置」随时改；配置保存到 `c2b_settings` 卷，重建 API 容器后仍会保留。
+- 公网模型：默认仅允许公网 HTTPS 地址。
+- 内网 / Docker / 宿主机模型：在可信网络内将 `.env` 的 `C2B_ALLOW_PRIVATE_LLM=1`，再运行 `docker compose up -d --force-recreate api`。这会放开 API 访问私网地址，不能与无认证的公网 Web 一起使用。
+- Docker Compose 内的模型服务可填写 `http://服务名:端口/v1`，例如 `http://ollama:11434/v1`；宿主机模型在 Docker Desktop 上通常使用 `http://host.docker.internal:11434/v1`。Linux 还需要为 `api` 服务配置 `extra_hosts: ["host.docker.internal:host-gateway"]`，并确保模型服务对 Docker 网桥可访问。
+- `C2B_ALLOW_PRIVATE_GIT` 与 LLM 开关独立，只有确需克隆内网 Git 时才设为 `1`。
 
 ## 远程访问与安全
 
 - 不要直接把 compose 的 `8080` 端口改成公网监听；远程使用请在前面部署带 HTTPS 和身份认证的反向代理。
 - 后端支持可选的 `C2B_API_TOKEN`。配置后，代理必须为 `/api` 请求注入 `X-C2B-Token`（或客户端发送 Bearer Token），否则 API 返回 401。
-- LLM/Git 地址默认仅允许公网 HTTPS，并拒绝本机、私网和云元数据地址。确需连接内网 Git 或本地 Ollama 时，分别显式设置 `C2B_ALLOW_PRIVATE_GIT=1` / `C2B_ALLOW_PRIVATE_LLM=1`，且只应在可信内网使用。
+- LLM/Git 地址默认仅允许公网 HTTPS，并拒绝本机、私网和云元数据地址。私网模型或 Git 只能通过 `.env` 中相应的显式开关启用，并且只应在可信内网使用。

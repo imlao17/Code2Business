@@ -6,9 +6,9 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: c2b
-      POSTGRES_USER: c2b
-      POSTGRES_PASSWORD: c2b_secret
+      POSTGRES_DB: ${C2B_POSTGRES_DB:-c2b}
+      POSTGRES_USER: ${C2B_POSTGRES_USER:-c2b}
+      POSTGRES_PASSWORD: ${C2B_POSTGRES_PASSWORD:?请先复制 .env.example 为 .env，并设置 C2B_POSTGRES_PASSWORD}
     volumes:
       - c2b_pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -23,10 +23,18 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
-      C2B_DB_URL: postgresql+psycopg://c2b:c2b_secret@postgres:5432/c2b
+      C2B_DB_URL: postgresql+psycopg://${C2B_POSTGRES_USER:-c2b}:${C2B_POSTGRES_PASSWORD:?请先设置 C2B_POSTGRES_PASSWORD}@postgres:5432/${C2B_POSTGRES_DB:-c2b}
       C2B_DATA_ROOT: /data
+      # Public HTTPS remains the safe default.  An internal model endpoint
+      # requires this explicit opt-in; see .env.example and README.md.
+      C2B_ALLOW_PRIVATE_LLM: ${C2B_ALLOW_PRIVATE_LLM:-0}
+      C2B_ALLOW_PRIVATE_GIT: ${C2B_ALLOW_PRIVATE_GIT:-0}
+      C2B_API_TOKEN: ${C2B_API_TOKEN:-}
+      C2B_JOB_LEASE_SECONDS: ${C2B_JOB_LEASE_SECONDS:-300}
     volumes:
       - c2b_data:/data/projects
+      # Keep Web-entered provider/model/key settings across API replacement.
+      - c2b_settings:/root/.c2b
     depends_on:
       postgres:
         condition: service_healthy
@@ -40,7 +48,7 @@ services:
     ports:
       # Safe default: local workstation only.  Remote deployments should put
       # an authenticated reverse proxy in front and opt into a public bind.
-      - "127.0.0.1:8080:80"
+      - "${C2B_WEB_BIND:-127.0.0.1}:8080:80"
     depends_on:
       - api
     restart: unless-stopped
@@ -48,3 +56,4 @@ services:
 volumes:
   c2b_pgdata:
   c2b_data:
+  c2b_settings:

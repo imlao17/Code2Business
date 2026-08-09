@@ -3,10 +3,11 @@
 > 依据：code-to-business-prd.md + mvp-tech-solution.md
 > 里程碑 M0-M6，总工期约 15 周（4 人配置），每任务含验收标准
 > 日期：2026-08-05
+> 当前实现对应：C2B v0.2.0
 
-> **实现同步（2026-08-08）**：本 WBS 记录目标路线。当前已落地 OpenAI Compatible 与 Anthropic Native
-> 云端 Provider，以及 CLI / Agent Skills 的 Agent Native 证据导出、结构化校验和导入路径；Web 因没有交互式
-> Agent 会话，仍只使用云端 Provider。
+> **阅读方式（2026-08-09）**：本 WBS 是目标路线和历史拆分，表中的任务、工期、技术栈及验收标准**不等于已经完成或当前承诺**。当前实现状态以根目录 README、`docs/architecture.md` 与 `docs/quality-baseline.md` 为准。
+
+> **当前证据快照**：已落地 OpenAI Compatible / Anthropic Native 云端 Provider，以及 CLI / Agent Skills 的 Agent Native 证据导出、结构化校验和导入路径；Web 因没有交互式 Agent 会话，仍只使用云端 Provider。RuoYi-Vue 固定提交已完成 Java / Spring MVC / MyBatis XML 的确定性图谱验证（24 项断言通过），详见 `docs/validation/ruoyi-vue-2026-08.md`。Web/API 已支持规则、流程和业务推演的 R1-R3 运行证据手工录入与审计；自动 OpenTelemetry/日志采集、业务规则独立人工抽样、Vue→API 映射、Celery/Redis 和多用户权限仍未完成。
 
 ---
 
@@ -15,7 +16,7 @@
 1. **按可演示交付物拆分**：每个里程碑结束都有可运行、可验收的成果（能展示给客户/投资人的程度）；
 2. **确定性分析先行，AI 语义后置**：图谱是地基，LLM 只在图谱之上工作；
 3. **规模化能力后置**：MVP 先把 ≤100 万行单机模式跑通，分片/分层架构在 M6 引入（但数据模型从第一天就按版本化、分片友好设计）；
-4. **测试样本贯穿**：开发期用若依（15-20 万行），验收期用 50-100 万行真实项目；
+4. **测试样本贯穿**：开发期用固定提交的 RuoYi-Vue（2026-08-09 实测 64,975 行，见质量基线），验收期用真实项目；富士通样本承担 247 万行的历史规模验证角色；
 5. **每任务有明确验收标准**，不以"实现功能"而以其效果达标为完成。
 
 ---

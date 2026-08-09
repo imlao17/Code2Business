@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "sample": {
+    "name": "RuoYi-Vue",
+    "repository": "https://github.com/yangzongzhuan/RuoYi-Vue",
+    "commit": "b5e14338e83ba4f932b6949bee8767a6a7220dbc",
+    "role": "Spring Boot + MyBatis + Vue deterministic graph regression sample"
+  },
+  "assertions": [
+    {"id": "api-login", "kind": "api", "method": "POST", "path": "/login"},
+    {"id": "api-user-list", "kind": "api", "method": "GET", "path": "/system/user/list"},
+    {"id": "api-user-create", "kind": "api", "method": "POST", "path": "/system/user"},
+    {"id": "api-user-delete", "kind": "api", "method": "DELETE", "path": "/system/user/{userIds}"},
+    {"id": "api-role-list", "kind": "api", "method": "GET", "path": "/system/role/list"},
+    {"id": "api-role-data-scope", "kind": "api", "method": "PUT", "path": "/system/role/dataScope"},
+    {"id": "api-dept-list", "kind": "api", "method": "GET", "path": "/system/dept/list"},
+    {"id": "api-menu-list", "kind": "api", "method": "GET", "path": "/system/menu/list"},
+
+    {"id": "table-sys-user", "kind": "table", "name": "sys_user"},
+    {"id": "table-sys-role", "kind": "table", "name": "sys_role"},
+    {"id": "table-sys-dept", "kind": "table", "name": "sys_dept"},
+    {"id": "table-sys-menu", "kind": "table", "name": "sys_menu"},
+    {"id": "table-sys-config", "kind": "table", "name": "sys_config"},
+    {"id": "table-sys-dict-data", "kind": "table", "name": "sys_dict_data"},
+    {"id": "table-sys-job", "kind": "table", "name": "sys_job"},
+    {"id": "table-sys-notice", "kind": "table", "name": "sys_notice"},
+
+    {"id": "sql-select-sys-user", "kind": "sql", "table": "sys_user", "op": "select"},
+    {"id": "sql-insert-sys-user", "kind": "sql", "table": "sys_user", "op": "insert"},
+    {"id": "sql-update-sys-user", "kind": "sql", "table": "sys_user", "op": "update"},
+    {"id": "sql-select-sys-role", "kind": "sql", "table": "sys_role", "op": "select"},
+    {"id": "sql-update-sys-role", "kind": "sql", "table": "sys_role", "op": "update"},
+    {"id": "sql-select-sys-dept", "kind": "sql", "table": "sys_dept", "op": "select"},
+    {"id": "sql-insert-sys-menu", "kind": "sql", "table": "sys_menu", "op": "insert"},
+    {"id": "sql-delete-sys-notice", "kind": "sql", "table": "sys_notice", "op": "delete"}
+  ]
+}

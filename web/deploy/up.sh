@@ -10,6 +10,20 @@ WHEEL_DIST_DIR="$SCRIPT_DIR/dist"
 
 cd "$SCRIPT_DIR"
 
+if [ ! -f .env ]; then
+  if ! command -v python3 >/dev/null 2>&1; then
+    echo "首次启动需要 python3，以生成数据库密码配置" >&2
+    exit 1
+  fi
+  generated_password="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
+  (
+    umask 077
+    sed "s/replace-with-a-long-url-safe-secret/$generated_password/" \
+      .env.example > .env
+  )
+  echo "已创建受限权限的 .env，并生成 PostgreSQL 密码。请妥善备份该文件。"
+fi
+
 echo "[1/4] 构建前端 ..."
 if ! command -v pnpm >/dev/null 2>&1; then
   echo "前端构建需要 pnpm（建议通过 corepack 启用）" >&2
@@ -44,4 +58,5 @@ docker compose up -d
 echo ""
 echo "✅ 已启动：http://localhost:8080"
 echo "   模型设置：打开网页后右上角「LLM 设置」选择 OpenAI Compatible 或 Anthropic Native 并配置"
+echo "   内网模型：在 .env 中设置 C2B_ALLOW_PRIVATE_LLM=1 后执行 docker compose up -d --force-recreate api"
 echo "   停止：./down.sh"

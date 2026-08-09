@@ -26,6 +26,20 @@ checksum_cmd() {
 
 cd "$SCRIPT_DIR"
 
+if [ ! -f .env ]; then
+  if ! command -v python3 >/dev/null 2>&1; then
+    echo "首次构建需要 python3，以生成数据库密码配置" >&2
+    exit 1
+  fi
+  generated_password="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
+  (
+    umask 077
+    sed "s/replace-with-a-long-url-safe-secret/$generated_password/" \
+      .env.example > .env
+  )
+  echo "已创建受限权限的 .env，并生成 PostgreSQL 密码。请妥善备份该文件。"
+fi
+
 echo "[1/5] 构建前端 ..."
 if ! command -v pnpm >/dev/null 2>&1; then
   echo "前端构建需要 pnpm（建议通过 corepack 启用）" >&2
@@ -77,7 +91,7 @@ echo "[5/5] 生成离线部署包 ..."
 tmp_dir="$(mktemp -d)"
 bundle_dir="$tmp_dir/$BUNDLE_NAME"
 mkdir -p "$bundle_dir"
-cp docker-compose.yml Dockerfile "$IMAGE_ARCHIVE" "$bundle_dir/"
+cp docker-compose.yml Dockerfile .env.example README.md "$IMAGE_ARCHIVE" "$bundle_dir/"
 cp -R nginx "$bundle_dir/"
 cp -R "$FRONTEND_DIST_DIR" "$bundle_dir/frontend-dist"
 cp -R "$WHEEL_DIST_DIR" "$bundle_dir/dist"
@@ -99,6 +113,7 @@ echo ""
 echo "目标机器部署："
 echo "  tar xzf $(basename "$BUNDLE_ARCHIVE")"
 echo "  cd $BUNDLE_NAME"
+echo "  cp .env.example .env && chmod 600 .env  # 修改部署密码与安全配置"
 echo "  shasum -a 256 -c MANIFEST.sha256    # Linux 可改用 sha256sum -c"
 echo "  docker load < c2b-web-images.tar.gz"
 echo "  docker compose up -d"

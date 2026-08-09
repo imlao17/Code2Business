@@ -37,6 +37,9 @@
               <template #title>
                 <span class="obj-name">{{ f.name }}</span>
                 <el-tag size="small" class="ml8" type="info">{{ f.confidence }}%</el-tag>
+                <el-tag size="small" class="ml8" :type="runtimeType(f.runtime_level)">
+                  {{ f.runtime_level || 'R0' }}
+                </el-tag>
               </template>
               <div class="obj-desc">{{ f.description }}</div>
               <div class="section">业务步骤</div>
@@ -50,6 +53,10 @@
                 <el-tag v-for="t in (f.tech_steps || []).slice(0, 15)" :key="t"
                         size="small" type="warning" class="mr4 mt4">{{ t }}</el-tag>
               </div>
+              <RuntimeEvidencePanel :pid="pid" target-type="flow" :target-id="f.id"
+                                    :initial-level="f.runtime_level"
+                                    :initial-items="f.runtime_evidence"
+                                    @changed="level => f.runtime_level = level" />
             </el-collapse-item>
           </el-collapse>
         </el-card>
@@ -61,11 +68,13 @@
 <script setup>
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import api from '../api'
+import RuntimeEvidencePanel from '../components/RuntimeEvidencePanel.vue'
 
 const props = defineProps({ pid: { type: [Number, String], default: null } })
 const objects = ref([])
 const flows = ref([])
 let loadToken = 0
+const runtimeType = v => ({ R3: 'success', R2: 'warning', R1: 'info', R0: 'info' }[v] || 'info')
 
 async function load() {
   const projectId = props.pid

@@ -14,6 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from . import models
+from .runtime_evidence import runtime_level
 
 DOC_TYPES = {
     "overview": ("系统现状说明书", "系统规模、模块地图、技术栈、入口、表与 SQL 概览"),
@@ -86,14 +87,31 @@ def _gather(s: Session, scan_id: int, include_unconfirmed: bool = False) -> dict
             .where(models.BusinessChain.scan_id == scan_id)
             .order_by(models.BusinessChain.id.desc()).limit(1)
         ).scalar_one_or_none()
+    allowed_runtime_targets = {("rule", rule.id) for rule in rules}
+    allowed_runtime_targets.update(("flow", flow.id) for flow in flows)
+    if chain is not None:
+        allowed_runtime_targets.add(("chain", chain.id))
+    runtime_evidence = [item for item in s.execute(
+        select(models.RuntimeEvidence).where(
+            models.RuntimeEvidence.scan_id == scan_id
+        ).order_by(models.RuntimeEvidence.id.desc())
+    ).scalars().all() if (item.target_type, item.target_id) in allowed_runtime_targets]
 
     return {
         "project": project, "scan": scan, "meta": meta, "stats": stats,
         "modules": modules, "domains": domains, "objects": objs,
         "rules": rules, "tables": tables, "sql_ops": sql_ops,
         "flows": flows, "entries": entries, "chain": chain,
+        "runtime_evidence": runtime_evidence,
         "include_unconfirmed": include_unconfirmed,
     }
+
+
+def _runtime_for(d: dict, target_type: str, target_id: int) -> list:
+    return [
+        item for item in d.get("runtime_evidence", [])
+        if item.target_type == target_type and item.target_id == target_id
+    ]
 
 
 def _state_label(state) -> str:
@@ -112,6 +130,7 @@ def _header(d: dict, doc_title: str) -> str:
         f"> 代码规模：{meta.get('total_lines', 0):,} 行 / {meta.get('total_files', 0):,} 文件\n"
         f"> 编码：{meta.get('encoding_samples', {})}\n"
         f"> 知识范围：{'草稿（含 AI 未确认项）' if d.get('include_unconfirmed') else '正式（仅纳入人工已确认的业务知识）'}\n"
+        "> 证据口径：V/代码定位表示静态证据；R0-R3 表示独立运行验证；人工确认状态单独展示\n"
     )
 
 
@@ -156,6 +175,7 @@ def _doc_overview(d: dict) -> str:
         ["业务域", len(d.get("domains", []))],
         ["业务对象", len(d.get("objects", []))],
         ["规则卡片", len(d.get("rules", []))],
+        ["运行证据记录", len(d.get("runtime_evidence", []))],
         ["业务推演", "已生成" if d.get("chain") else "未生成"],
     ]))
     lines.append("## 2. 模块地图")
@@ -169,6 +189,14 @@ def _doc_overview(d: dict) -> str:
     lines.append(_table([["类型", "名称", "位置"]] + [
         [e.entry_kind or "-", e.name, f"{e.file_path}:{e.start_line}"]
         for e in d["entries"][:40]]))
+    if d.get("flows"):
+        lines.append("## 5. 业务流程与运行验证")
+        lines.append(_table([["业务流程", "AI可信度", "运行验证", "人工确认"]] + [
+            [flow.name or "-", f"{flow.confidence}%",
+             runtime_level(_runtime_for(d, "flow", flow.id)),
+             "已确认" if flow.confirmed else "未确认"]
+            for flow in d["flows"][:40]
+        ]))
     return "\n\n".join(lines)
 
 
@@ -211,6 +239,7 @@ def _doc_rules(d: dict) -> str:
     lines = [_header(d, "业务规则清单")]
     lines.append(f"共 {len(d['rules'])} 条规则卡片，按可信度降序：")
     for r in d["rules"]:
+        runtime_items = _runtime_for(d, "rule", r.id)
         lines.append(f"### {r.name or '(未命名)'}")
         lines.append(_table([
             ["字段", "内容"],
@@ -225,9 +254,15 @@ def _doc_rules(d: dict) -> str:
             ["异常处理", r.exception or "-"],
             ["影响范围", r.impact or "-"],
             ["代码证据", f"{r.evidence_file}:{r.evidence_lines}"],
-            ["可信度", f"{r.confidence}%"],
-            ["确认状态", _state_label(r.state)],
+            ["AI可信度", f"{r.confidence}%"],
+            ["运行验证", runtime_level(runtime_items)],
+            ["人工确认状态", _state_label(r.state)],
         ]))
+        if runtime_items:
+            lines.append(_table([["运行等级", "环境", "类型", "摘要", "引用"]] + [
+                [item.level, item.environment, item.evidence_type,
+                 item.summary, item.reference or "-"] for item in runtime_items
+            ]))
     return "\n\n".join(lines)
 
 
@@ -271,6 +306,9 @@ def _doc_acceptance(d: dict) -> str:
     if chain and chain.mainline:
         lines.append(" -> ".join(chain.mainline))
         lines.append(f"设计逻辑：{chain.design_narrative or '-'}")
+        lines.append(
+            f"运行验证：{runtime_level(_runtime_for(d, 'chain', chain.id))}"
+        )
         for a in (chain.assumptions or [])[:10]:
             lines.append(f"- [ ] 待确认：{a}")
     elif not d.get("include_unconfirmed"):

@@ -1,6 +1,7 @@
 import tempfile
 import time
 import unittest
+from datetime import timedelta
 from pathlib import Path
 from unittest.mock import patch
 
@@ -13,6 +14,7 @@ from c2b import models
 from c2b.api.routes import (
     BatchConfirmIn,
     ConfirmIn,
+    RuntimeEvidenceIn,
     _create_project_job,
     _excel_safe,
     _latest_scan,
@@ -22,8 +24,11 @@ from c2b.api.routes import (
     confirm_rules_batch,
     delete_project,
     pipeline,
+    runtime_evidence_create,
+    runtime_evidence_delete,
+    runtime_evidence_list,
 )
-from c2b.db import Base, make_engine
+from c2b.db import Base, make_engine, recover_stale_label_jobs
 
 
 class DatabaseTestCase(unittest.TestCase):
@@ -180,7 +185,7 @@ class ConfirmationIsolationTests(DatabaseTestCase):
 
         self.assertEqual(confirm_step["count"], 1)
 
-    def test_repeated_confirmation_does_not_keep_inflating_confidence(self):
+    def test_confirmation_does_not_modify_semantic_confidence(self):
         confirm_rule(
             self.p1.id, self.rule1.id, ConfirmIn(action="confirm"), self.s
         )
@@ -189,7 +194,7 @@ class ConfirmationIsolationTests(DatabaseTestCase):
         )
 
         self.s.refresh(self.rule1)
-        self.assertEqual(self.rule1.confidence, 70)
+        self.assertEqual(self.rule1.confidence, 60)
 
     def test_batch_confirmation_audit_contains_full_before_and_after_state(self):
         confirm_rules_batch(
@@ -201,7 +206,78 @@ class ConfirmationIsolationTests(DatabaseTestCase):
         audit = self.s.execute(select(models.Confirmation)).scalar_one()
         self.assertEqual(audit.before["logic"], "old")
         self.assertEqual(audit.before["confidence"], 60)
-        self.assertEqual(audit.after["confidence"], 70)
+        self.assertEqual(audit.after["confidence"], 60)
+
+
+class RuntimeEvidenceTests(DatabaseTestCase):
+    def setUp(self):
+        super().setUp()
+        self.p1, self.scan1 = self.project_with_scan("runtime-one")
+        self.p2, self.scan2 = self.project_with_scan("runtime-two")
+        self.rule = models.BusinessRule(scan_id=self.scan1.id, name="rule")
+        self.other_rule = models.BusinessRule(scan_id=self.scan2.id, name="other")
+        self.flow = models.BusinessFlow(scan_id=self.scan1.id, name="flow")
+        self.chain = models.BusinessChain(scan_id=self.scan1.id, mainline=[])
+        self.s.add_all([self.rule, self.other_rule, self.flow, self.chain])
+        self.s.commit()
+
+    def create(self, target_type, target_id, level, environment):
+        return runtime_evidence_create(
+            self.p1.id,
+            RuntimeEvidenceIn(
+                target_type=target_type,
+                target_id=target_id,
+                level=level,
+                evidence_type="test" if level == "R1" else "trace",
+                environment=environment,
+                summary=f"{level} evidence",
+                reference="test_runtime_evidence",
+            ),
+            self.s,
+        )
+
+    def test_runtime_level_is_derived_independently_for_each_target(self):
+        self.assertEqual(
+            runtime_evidence_list(
+                self.p1.id, "rule", self.rule.id, 500, self.s
+            )["runtime_level"],
+            "R0",
+        )
+        self.assertEqual(
+            self.create("rule", self.rule.id, "R1", "test")["runtime_level"],
+            "R1",
+        )
+        self.assertEqual(
+            self.create("rule", self.rule.id, "R2", "staging")["runtime_level"],
+            "R2",
+        )
+        self.assertEqual(
+            self.create("rule", self.rule.id, "R3", "production")["runtime_level"],
+            "R3",
+        )
+        flow_result = self.create("flow", self.flow.id, "R1", "test")
+        chain_result = self.create("chain", self.chain.id, "R2", "controlled")
+        self.assertEqual(flow_result["runtime_level"], "R1")
+        self.assertEqual(chain_result["runtime_level"], "R2")
+
+    def test_runtime_target_and_environment_are_validated(self):
+        with self.assertRaises(HTTPException) as cm:
+            self.create("rule", self.other_rule.id, "R1", "test")
+        self.assertEqual(cm.exception.status_code, 404)
+
+        with self.assertRaises(HTTPException) as cm:
+            self.create("rule", self.rule.id, "R3", "staging")
+        self.assertEqual(cm.exception.status_code, 400)
+
+    def test_runtime_evidence_can_be_corrected_without_changing_rule_state(self):
+        result = self.create("rule", self.rule.id, "R1", "test")
+        evidence_id = result["item"]["id"]
+        deleted = runtime_evidence_delete(self.p1.id, evidence_id, self.s)
+
+        self.s.refresh(self.rule)
+        self.assertEqual(deleted["runtime_level"], "R0")
+        self.assertEqual(self.rule.state, models.RuleState.AI_LABELED)
+        self.assertEqual(self.rule.confidence, 0)
 
 
 class ProjectDeletionTests(DatabaseTestCase):
@@ -247,6 +323,15 @@ class ProjectDeletionTests(DatabaseTestCase):
                     target_id=rule.id,
                     action="confirm",
                 ),
+                models.RuntimeEvidence(
+                    scan_id=scan.id,
+                    target_type="rule",
+                    target_id=rule.id,
+                    level="R1",
+                    evidence_type="test",
+                    environment="test",
+                    summary="passed",
+                ),
                 models.ModuleAnalysis(
                     scan_id=scan.id, module_id=module.id, module_name="m"
                 ),
@@ -259,6 +344,7 @@ class ProjectDeletionTests(DatabaseTestCase):
 
         self.assertIsNone(self.s.get(models.Project, project.id))
         self.assertEqual(self.s.query(models.Confirmation).count(), 0)
+        self.assertEqual(self.s.query(models.RuntimeEvidence).count(), 0)
         self.assertEqual(self.s.query(models.ModuleAnalysis).count(), 0)
         self.assertEqual(self.s.query(models.QaRecord).count(), 0)
 
@@ -289,6 +375,37 @@ class BackgroundJobExclusionTests(DatabaseTestCase):
             .count(),
             1,
         )
+
+    def test_stale_job_is_released_with_a_retryable_error(self):
+        project, _scan = self.project_with_scan("stale-job")
+        other_project, _other_scan = self.project_with_scan("fresh-job")
+        now = models.utcnow()
+        stale = models.LabelJob(
+            project_id=project.id,
+            status="running",
+            started_at=now - timedelta(minutes=10),
+            heartbeat_at=now - timedelta(minutes=10),
+        )
+        fresh = models.LabelJob(
+            project_id=other_project.id,
+            status="running",
+            started_at=now,
+            heartbeat_at=now,
+        )
+        self.s.add_all([stale, fresh])
+        self.s.commit()
+
+        self.assertEqual(recover_stale_label_jobs(self.s, lease_seconds=60), 1)
+        self.s.refresh(stale)
+        self.s.refresh(fresh)
+        self.assertEqual(stale.status, "failed")
+        self.assertIn("重新运行", stale.error)
+        self.assertIsNotNone(stale.finished_at)
+        self.assertEqual(fresh.status, "running")
+
+        self.assertEqual(recover_stale_label_jobs(self.s, force=True), 1)
+        self.s.refresh(fresh)
+        self.assertEqual(fresh.status, "failed")
 
 
 class ExportSafetyTests(unittest.TestCase):
@@ -331,6 +448,8 @@ class ModuleBatchOutcomeTests(DatabaseTestCase):
             session.commit()
 
         with patch("c2b.db.SessionLocal", self.Session), patch(
+            "c2b.api.routes.SessionLocal", self.Session
+        ), patch(
             "c2b.llm.LLMClient", return_value=object()
         ), patch(
             "c2b.semantics.module_analysis.analyze_module",

@@ -1,0 +1,3 @@
+sample,scan_id,artifact_type,artifact_id,rule_type,evidence_file,evidence_lines,reviewer,reviewed_at,verdict,reason,corrected_summary
+# verdict: correct | partly_correct | incorrect | insufficient_evidence | not_applicable
+# This is a blank, independently reviewed record. Do not derive a semantic accuracy percentage from model output alone.

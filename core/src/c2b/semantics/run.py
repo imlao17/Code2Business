@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from .. import models
 from ..llm import LLMClient, usage_summary
+from ..runtime_evidence import delete_for_targets
 from . import domains as dom_mod
 from . import rules as rules_mod
 
@@ -329,6 +330,7 @@ def run_label(s: Session, project_id: int, limit: int, concurrency: int,
             )
         ).scalars().all())
         if generated_rule_ids:
+            delete_for_targets(s, scan.id, "rule", generated_rule_ids)
             s.query(models.Question).filter(
                 models.Question.rule_id.in_(generated_rule_ids)
             ).delete(synchronize_session=False)
@@ -416,6 +418,13 @@ def run_label(s: Session, project_id: int, limit: int, concurrency: int,
                     models.BusinessFlow.entry_method_id.isnot(None),
                 )
             ).scalars().all())
+            generated_flow_ids = list(s.execute(
+                select(models.BusinessFlow.id).where(
+                    models.BusinessFlow.scan_id == scan.id,
+                    models.BusinessFlow.confirmed.is_not(True),
+                )
+            ).scalars().all())
+            delete_for_targets(s, scan.id, "flow", generated_flow_ids)
             s.query(models.BusinessFlow).filter(
                 models.BusinessFlow.scan_id == scan.id,
                 models.BusinessFlow.confirmed.is_not(True),
@@ -501,12 +510,29 @@ def run_label(s: Session, project_id: int, limit: int, concurrency: int,
                 new_chain = chain_mod.run_chain(s, scan.id, client)
                 if new_chain is not None:
                     s.flush()
+                    replaced_chain_ids = list(s.execute(
+                        select(models.BusinessChain.id).where(
+                            models.BusinessChain.scan_id == scan.id,
+                            models.BusinessChain.id != new_chain.id,
+                        )
+                    ).scalars().all())
+                    delete_for_targets(
+                        s, scan.id, "chain", replaced_chain_ids
+                    )
                     s.query(models.BusinessChain).filter(
                         models.BusinessChain.scan_id == scan.id,
                         models.BusinessChain.id != new_chain.id,
                     ).delete(synchronize_session=False)
                     n_chain = 1
                 elif object_specs is not None:
+                    replaced_chain_ids = list(s.execute(
+                        select(models.BusinessChain.id).where(
+                            models.BusinessChain.scan_id == scan.id
+                        )
+                    ).scalars().all())
+                    delete_for_targets(
+                        s, scan.id, "chain", replaced_chain_ids
+                    )
                     s.query(models.BusinessChain).filter(
                         models.BusinessChain.scan_id == scan.id
                     ).delete(synchronize_session=False)

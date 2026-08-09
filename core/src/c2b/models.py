@@ -362,8 +362,45 @@ class BusinessChain(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
+class RuntimeEvidence(Base):
+    """A test or observed-run fact attached to one semantic conclusion.
+
+    ``target_type`` and ``target_id`` deliberately form a polymorphic link to
+    a rule, flow, or chain.  Ownership is denormalized through ``scan_id`` so
+    every API query can enforce the project boundary without trusting a
+    client-supplied target id.  R0 is not stored: it is derived when a target
+    has no runtime evidence.
+    """
+    __tablename__ = "runtime_evidence"
+    __table_args__ = (
+        Index(
+            "ix_runtime_evidence_target",
+            "scan_id", "target_type", "target_id", "level",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    scan_id: Mapped[int] = mapped_column(ForeignKey("scans.id"), index=True)
+    target_type: Mapped[str] = mapped_column(String(20))  # rule/flow/chain
+    target_id: Mapped[int] = mapped_column(Integer)
+    level: Mapped[str] = mapped_column(String(2))          # R1/R2/R3; R0 is derived
+    evidence_type: Mapped[str] = mapped_column(String(30))
+    environment: Mapped[str] = mapped_column(String(30))   # test/controlled/staging/production
+    summary: Mapped[str] = mapped_column(Text)
+    reference: Mapped[str | None] = mapped_column(String(2048))
+    observed_at: Mapped[datetime | None] = mapped_column(DateTime)
+    created_by: Mapped[str | None] = mapped_column(String(100))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
 class LabelJob(Base):
-    """标注任务（异步执行）。"""
+    """Web 后台任务（扫描、标注或模块规格）。
+
+    The current MVP runs workers in-process.  ``heartbeat_at`` is therefore a
+    lease, not a distributed lock: on a later startup a stale lease tells us
+    the former process cannot still own the worker and the job can be made
+    visibly retryable instead of remaining ``running`` forever.
+    """
     __tablename__ = "label_jobs"
     __table_args__ = (
         Index(
@@ -385,6 +422,8 @@ class LabelJob(Base):
     result: Mapped[dict | None] = mapped_column(JSON)
     error: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime)
+    heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime, index=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime)
 
 
