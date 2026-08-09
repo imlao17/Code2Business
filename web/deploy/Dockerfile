@@ -3,6 +3,12 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+# Web supports importing a repository URL, so the runtime image must include
+# the git executable used by the background clone worker.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
 # 复制 wheel 并安装（c2b 依赖自动安装）
 COPY dist/c2b-*.whl /tmp/
 RUN pip install --no-cache-dir /tmp/c2b-*.whl && rm /tmp/*.whl

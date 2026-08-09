@@ -11,6 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 
 from c2b import models
+from c2b.api.main import healthz
 from c2b.api.routes import (
     BatchConfirmIn,
     ConfirmIn,
@@ -53,6 +54,14 @@ class DatabaseTestCase(unittest.TestCase):
         self.s.add(scan)
         self.s.flush()
         return p, scan
+
+
+class HealthCheckTests(DatabaseTestCase):
+    def test_health_check_verifies_database_and_reports_version(self):
+        result = healthz(self.s)
+
+        self.assertEqual(result["status"], "ok")
+        self.assertRegex(result["version"], r"^\d+\.\d+\.\d+$")
 
 
 class LatestScanTests(DatabaseTestCase):

@@ -24,11 +24,16 @@ class SecurityBoundaryTests(unittest.TestCase):
             method="GET",
             headers={"authorization": "Bearer secret-token"},
         )
+        health = SimpleNamespace(
+            url=SimpleNamespace(path="/healthz"), method="GET", headers={}
+        )
         with patch.dict("os.environ", {"C2B_API_TOKEN": "secret-token"}):
             denied = asyncio.run(_optional_api_token(missing, downstream))
             allowed = asyncio.run(_optional_api_token(valid, downstream))
+            health_allowed = asyncio.run(_optional_api_token(health, downstream))
         self.assertEqual(denied.status_code, 401)
         self.assertEqual(allowed, "allowed")
+        self.assertEqual(health_allowed, "allowed")
 
     def test_outbound_url_rejects_private_network_and_credentials(self):
         from c2b.security import UnsafeUrlError, validate_outbound_url

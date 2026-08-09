@@ -1,0 +1,2196 @@
+{
+  "contract_version": "1.0",
+  "domains": [
+    {
+      "name": "身份认证与账号安全",
+      "description": "登录、验证码、密码策略、个人资料与在线身份权限维护。",
+      "modules": [
+        "ruoyi-admin/src",
+        "ruoyi-common/src",
+        "ruoyi-framework/src",
+        "ruoyi-system/src"
+      ],
+      "confidence": 93
+    },
+    {
+      "name": "组织与权限管理",
+      "description": "部门、用户、角色、菜单、岗位及其数据范围与授权关系。",
+      "modules": [
+        "ruoyi-admin/src",
+        "ruoyi-common/src",
+        "ruoyi-framework/src",
+        "ruoyi-system/src"
+      ],
+      "confidence": 95
+    },
+    {
+      "name": "系统配置与字典",
+      "description": "系统参数、数据字典及缓存刷新。",
+      "modules": [
+        "ruoyi-admin/src",
+        "ruoyi-system/src",
+        "ruoyi-common/src"
+      ],
+      "confidence": 94
+    },
+    {
+      "name": "通知公告",
+      "description": "公告发布、展示、阅读状态和删除联动。",
+      "modules": [
+        "ruoyi-admin/src",
+        "ruoyi-system/src"
+      ],
+      "confidence": 94
+    },
+    {
+      "name": "作业调度",
+      "description": "定时任务配置、安全校验、启停和立即执行。",
+      "modules": [
+        "ruoyi-quartz/src",
+        "ruoyi-common/src"
+      ],
+      "confidence": 96
+    },
+    {
+      "name": "代码生成",
+      "description": "数据库表导入、建表、代码预览与生成。",
+      "modules": [
+        "ruoyi-generator/src",
+        "ruoyi-common/src"
+      ],
+      "confidence": 94
+    },
+    {
+      "name": "文件与公共服务",
+      "description": "文件上传下载、资源访问和通用响应。",
+      "modules": [
+        "ruoyi-admin/src",
+        "ruoyi-common/src"
+      ],
+      "confidence": 94
+    },
+    {
+      "name": "平台公共机制",
+      "description": "分页、排序、数据脱敏等跨业务公共规则。",
+      "modules": [
+        "ruoyi-common/src"
+      ],
+      "confidence": 91
+    }
+  ],
+  "objects": [
+    {
+      "name": "登录会话",
+      "domain": "身份认证与账号安全",
+      "description": "用户认证后形成的令牌、权限与用户上下文。",
+      "source_tables": [
+        "sys_user"
+      ],
+      "source_classes": [
+        "LoginUser",
+        "SysUser"
+      ],
+      "actions": [
+        "登录",
+        "刷新权限",
+        "解锁屏幕"
+      ],
+      "confidence": 94
+    },
+    {
+      "name": "用户账号",
+      "domain": "组织与权限管理",
+      "description": "平台用户及其部门、岗位、角色和状态。",
+      "source_tables": [
+        "sys_user",
+        "sys_user_post",
+        "sys_user_role"
+      ],
+      "source_classes": [
+        "SysUser"
+      ],
+      "actions": [
+        "新增",
+        "修改",
+        "重置密码",
+        "启停",
+        "授权"
+      ],
+      "confidence": 96
+    },
+    {
+      "name": "部门",
+      "domain": "组织与权限管理",
+      "description": "树形组织部门及数据范围。",
+      "source_tables": [
+        "sys_dept"
+      ],
+      "source_classes": [
+        "SysDept"
+      ],
+      "actions": [
+        "新增",
+        "修改",
+        "排序",
+        "删除"
+      ],
+      "confidence": 97
+    },
+    {
+      "name": "角色",
+      "domain": "组织与权限管理",
+      "description": "菜单权限、数据范围和用户授权集合。",
+      "source_tables": [
+        "sys_role",
+        "sys_role_menu",
+        "sys_role_dept",
+        "sys_user_role"
+      ],
+      "source_classes": [
+        "SysRole",
+        "SysUserRole"
+      ],
+      "actions": [
+        "新增",
+        "修改",
+        "授权",
+        "启停"
+      ],
+      "confidence": 97
+    },
+    {
+      "name": "菜单",
+      "domain": "组织与权限管理",
+      "description": "路由、外链和角色菜单分配形成的导航资源。",
+      "source_tables": [
+        "sys_menu",
+        "sys_role_menu"
+      ],
+      "source_classes": [
+        "SysMenu"
+      ],
+      "actions": [
+        "新增",
+        "修改",
+        "排序",
+        "删除"
+      ],
+      "confidence": 96
+    },
+    {
+      "name": "岗位",
+      "domain": "组织与权限管理",
+      "description": "用户可关联的岗位主数据。",
+      "source_tables": [
+        "sys_post",
+        "sys_user_post"
+      ],
+      "source_classes": [
+        "SysPost"
+      ],
+      "actions": [
+        "新增",
+        "修改",
+        "删除"
+      ],
+      "confidence": 96
+    },
+    {
+      "name": "系统参数",
+      "domain": "系统配置与字典",
+      "description": "以唯一参数键访问并支持缓存的配置项。",
+      "source_tables": [
+        "sys_config"
+      ],
+      "source_classes": [
+        "SysConfig"
+      ],
+      "actions": [
+        "新增",
+        "修改",
+        "删除",
+        "刷新缓存"
+      ],
+      "confidence": 97
+    },
+    {
+      "name": "数据字典",
+      "domain": "系统配置与字典",
+      "description": "字典类型及类型下的可选数据。",
+      "source_tables": [
+        "sys_dict_type",
+        "sys_dict_data"
+      ],
+      "source_classes": [
+        "SysDictType",
+        "SysDictData"
+      ],
+      "actions": [
+        "新增",
+        "修改",
+        "查询",
+        "刷新缓存"
+      ],
+      "confidence": 97
+    },
+    {
+      "name": "通知公告",
+      "domain": "通知公告",
+      "description": "公告内容及按用户记录的阅读状态。",
+      "source_tables": [
+        "sys_notice",
+        "sys_notice_read"
+      ],
+      "source_classes": [
+        "SysNotice"
+      ],
+      "actions": [
+        "发布",
+        "阅读",
+        "批量已读",
+        "删除"
+      ],
+      "confidence": 97
+    },
+    {
+      "name": "定时任务",
+      "domain": "作业调度",
+      "description": "带 Cron、调用目标和启停状态的调度任务。",
+      "source_tables": [
+        "sys_job",
+        "sys_job_log"
+      ],
+      "source_classes": [
+        "SysJob",
+        "SysJobLog"
+      ],
+      "actions": [
+        "新增",
+        "修改",
+        "启停",
+        "立即执行"
+      ],
+      "confidence": 98
+    },
+    {
+      "name": "代码生成表",
+      "domain": "代码生成",
+      "description": "从数据库表结构导入的代码生成元数据。",
+      "source_tables": [
+        "gen_table",
+        "gen_table_column",
+        "information_schema"
+      ],
+      "source_classes": [
+        "GenTable",
+        "GenTableColumn"
+      ],
+      "actions": [
+        "导入",
+        "建表",
+        "同步",
+        "生成"
+      ],
+      "confidence": 96
+    },
+    {
+      "name": "文件资源",
+      "domain": "文件与公共服务",
+      "description": "上传文件、下载文件和本地资源。",
+      "source_tables": [],
+      "source_classes": [
+        "MultipartFile"
+      ],
+      "actions": [
+        "上传",
+        "下载",
+        "下载后删除"
+      ],
+      "confidence": 93
+    }
+  ],
+  "rules": [
+    {
+      "name": "关闭验证码时直接返回开关状态",
+      "domain": "身份认证与账号安全",
+      "rule_type": "trigger",
+      "trigger": "请求 /captchaImage",
+      "pre_condition": "验证码配置为关闭",
+      "logic": "系统配置关闭验证码时，不生成图片和缓存验证码，只返回 captchaEnabled=false。",
+      "status_change": "",
+      "data_change": "不写入验证码缓存",
+      "follow_up": "",
+      "exception": "",
+      "impact": "身份认证与账号安全",
+      "confidence": 98,
+      "source_method": "com.ruoyi.web.controller.common.CaptchaController.getCode(HttpServletResponse response)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/common/CaptchaController.java",
+        "lines": [
+          49,
+          54
+        ],
+        "snippet": "if (!captchaEnabled) { return ajax; }"
+      }
+    },
+    {
+      "name": "验证码按配置生成并限时缓存",
+      "domain": "身份认证与账号安全",
+      "rule_type": "calculation",
+      "trigger": "验证码功能开启后请求验证码",
+      "pre_condition": "",
+      "logic": "math 类型展示算式并缓存答案，char 类型展示并缓存字符；缓存键由固定前缀和 UUID 组成。",
+      "status_change": "",
+      "data_change": "Redis 写入验证码答案及过期时间",
+      "follow_up": "返回 UUID 与 Base64 图片",
+      "exception": "",
+      "impact": "身份认证与账号安全",
+      "confidence": 98,
+      "source_method": "com.ruoyi.web.controller.common.CaptchaController.getCode(HttpServletResponse response)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/common/CaptchaController.java",
+        "lines": [
+          56,
+          78
+        ],
+        "snippet": "math 提取算式结果；char 直接使用字符；按 CAPTCHA_EXPIRATION 分钟缓存"
+      }
+    },
+    {
+      "name": "验证码图片写出失败返回错误",
+      "domain": "身份认证与账号安全",
+      "rule_type": "exception",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "图片编码发生 IOException 时返回错误结果，不返回正常验证码图片。",
+      "status_change": "",
+      "data_change": "",
+      "follow_up": "",
+      "exception": "返回 IOException 消息",
+      "impact": "身份认证与账号安全",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.common.CaptchaController.getCode(HttpServletResponse response)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/common/CaptchaController.java",
+        "lines": [
+          81,
+          88
+        ],
+        "snippet": "catch (IOException e) { return AjaxResult.error(e.getMessage()); }"
+      }
+    },
+    {
+      "name": "通用下载拒绝非法文件名",
+      "domain": "文件与公共服务",
+      "rule_type": "validation",
+      "trigger": "请求通用文件下载",
+      "pre_condition": "",
+      "logic": "文件名未通过允许下载检查时拒绝下载。",
+      "status_change": "",
+      "data_change": "",
+      "follow_up": "",
+      "exception": "记录下载失败日志",
+      "impact": "文件与公共服务",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.common.CommonController.fileDownload(String fileName, Boolean delete, HttpServletResponse response, HttpServletRequest request)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/common/CommonController.java",
+        "lines": [
+          50,
+          53
+        ],
+        "snippet": "if (!FileUtils.checkAllowDownload(fileName)) { throw new Exception(...); }"
+      }
+    },
+    {
+      "name": "下载成功后可按请求删除源文件",
+      "domain": "文件与公共服务",
+      "rule_type": "trigger",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "文件通过下载安全检查",
+      "logic": "先输出下载文件；delete 为 true 时随后删除服务器上的源文件。",
+      "status_change": "",
+      "data_change": "可删除下载目录中的源文件",
+      "follow_up": "",
+      "exception": "",
+      "impact": "文件与公共服务",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.common.CommonController.fileDownload(String fileName, Boolean delete, HttpServletResponse response, HttpServletRequest request)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/common/CommonController.java",
+        "lines": [
+          54,
+          63
+        ],
+        "snippet": "FileUtils.writeBytes(...); if (delete) { FileUtils.deleteFile(filePath); }"
+      }
+    },
+    {
+      "name": "本地资源下载拒绝非法资源路径",
+      "domain": "文件与公共服务",
+      "rule_type": "validation",
+      "trigger": "请求本地资源下载",
+      "pre_condition": "",
+      "logic": "资源参数必须通过下载检查，随后去除资源前缀并从 profile 目录输出。",
+      "status_change": "",
+      "data_change": "",
+      "follow_up": "",
+      "exception": "非法资源抛出异常并记录失败日志",
+      "impact": "文件与公共服务",
+      "confidence": 98,
+      "source_method": "com.ruoyi.web.controller.common.CommonController.resourceDownload(String resource, HttpServletRequest request, HttpServletResponse response)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/common/CommonController.java",
+        "lines": [
+          143,
+          155
+        ],
+        "snippet": "checkAllowDownload(resource); stripPrefix(resource); writeBytes(...)"
+      }
+    },
+    {
+      "name": "新增系统参数键必须唯一",
+      "domain": "系统配置与字典",
+      "rule_type": "validation",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "新增前校验参数键唯一；重复则拒绝，否则记录创建人并新增。",
+      "status_change": "",
+      "data_change": "写入 sys_config",
+      "follow_up": "",
+      "exception": "参数键已存在时返回新增失败",
+      "impact": "系统配置与字典",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysConfigController.add(@Validated @RequestBody SysConfig config)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysConfigController.java",
+        "lines": [
+          86,
+          91
+        ],
+        "snippet": "if (!configService.checkConfigKeyUnique(config)) { return error(...); }"
+      }
+    },
+    {
+      "name": "刷新系统参数缓存",
+      "domain": "系统配置与字典",
+      "rule_type": "trigger",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "具备 system:config:remove 权限",
+      "logic": "只有具备参数删除权限的请求可触发参数缓存重置。",
+      "status_change": "",
+      "data_change": "重建参数缓存",
+      "follow_up": "",
+      "exception": "",
+      "impact": "系统配置与字典",
+      "confidence": 98,
+      "source_method": "com.ruoyi.web.controller.system.SysConfigController.refreshCache()",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysConfigController.java",
+        "lines": [
+          125,
+          131
+        ],
+        "snippet": "@PreAuthorize(...remove...); configService.resetConfigCache();"
+      }
+    },
+    {
+      "name": "部门选择列表排除自身及后代",
+      "domain": "组织与权限管理",
+      "rule_type": "other",
+      "trigger": "查询排除指定节点的部门列表",
+      "pre_condition": "",
+      "logic": "编辑上级部门时，从候选列表移除当前部门及所有后代，避免产生循环层级。",
+      "status_change": "",
+      "data_change": "",
+      "follow_up": "",
+      "exception": "",
+      "impact": "组织与权限管理",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysDeptController.excludeChild(@PathVariable(value = \"deptId\", required = false) Long deptId)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysDeptController.java",
+        "lines": [
+          56,
+          58
+        ],
+        "snippet": "removeIf(部门ID等于目标ID或 ancestors 包含目标ID)"
+      }
+    },
+    {
+      "name": "查看部门详情前校验数据范围",
+      "domain": "组织与权限管理",
+      "rule_type": "permission",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "具备 system:dept:query 权限",
+      "logic": "查看部门不仅需要查询权限，还必须通过目标部门的数据范围检查。",
+      "status_change": "",
+      "data_change": "",
+      "follow_up": "",
+      "exception": "数据范围不允许时由服务拒绝",
+      "impact": "组织与权限管理",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysDeptController.getInfo(@PathVariable Long deptId)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysDeptController.java",
+        "lines": [
+          64,
+          69
+        ],
+        "snippet": "@PreAuthorize(system:dept:query); checkDeptDataScope(deptId)"
+      }
+    },
+    {
+      "name": "同级部门名称必须唯一",
+      "domain": "组织与权限管理",
+      "rule_type": "validation",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "新增部门前校验部门名称唯一，重复名称不写入。",
+      "status_change": "",
+      "data_change": "成功时写入 sys_dept 并记录创建人",
+      "follow_up": "",
+      "exception": "",
+      "impact": "组织与权限管理",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysDeptController.add(@Validated @RequestBody SysDept dept)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysDeptController.java",
+        "lines": [
+          80,
+          85
+        ],
+        "snippet": "if (!checkDeptNameUnique(dept)) { return error(...); }"
+      }
+    },
+    {
+      "name": "修改部门前校验数据范围",
+      "domain": "组织与权限管理",
+      "rule_type": "permission",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "具备 system:dept:edit 权限",
+      "logic": "修改部门前先检查目标部门的数据范围；通过后才继续唯一性和层级校验。",
+      "status_change": "",
+      "data_change": "",
+      "follow_up": "",
+      "exception": "",
+      "impact": "组织与权限管理",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysDeptController.edit(@Validated @RequestBody SysDept dept)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysDeptController.java",
+        "lines": [
+          94,
+          100
+        ],
+        "snippet": "checkDeptDataScope(deptId); checkDeptNameUnique(dept)"
+      }
+    },
+    {
+      "name": "上级部门不能选择自身",
+      "domain": "组织与权限管理",
+      "rule_type": "validation",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "修改部门时，parentId 不得等于本部门 ID。",
+      "status_change": "",
+      "data_change": "",
+      "follow_up": "",
+      "exception": "返回上级部门不能是自己的错误",
+      "impact": "组织与权限管理",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysDeptController.edit(@Validated @RequestBody SysDept dept)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysDeptController.java",
+        "lines": [
+          102,
+          105
+        ],
+        "snippet": "if (dept.getParentId().equals(deptId)) { return error(...); }"
+      }
+    },
+    {
+      "name": "存在正常子部门时不能停用父部门",
+      "domain": "组织与权限管理",
+      "rule_type": "status",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "目标状态为停用",
+      "logic": "拟停用部门仍包含未停用子部门时，拒绝状态修改。",
+      "status_change": "正常 → 停用（受子部门状态约束）",
+      "data_change": "",
+      "follow_up": "",
+      "exception": "",
+      "impact": "组织与权限管理",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysDeptController.edit(@Validated @RequestBody SysDept dept)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysDeptController.java",
+        "lines": [
+          106,
+          111
+        ],
+        "snippet": "DEPT_DISABLE 且 selectNormalChildrenDeptById(deptId) > 0 时拒绝"
+      }
+    },
+    {
+      "name": "存在下级部门时禁止删除部门",
+      "domain": "组织与权限管理",
+      "rule_type": "validation",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "部门有下级节点时不得删除。",
+      "status_change": "",
+      "data_change": "",
+      "follow_up": "",
+      "exception": "返回存在下级部门警告",
+      "impact": "组织与权限管理",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysDeptController.remove(@PathVariable Long deptId)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysDeptController.java",
+        "lines": [
+          136,
+          139
+        ],
+        "snippet": "if (deptService.hasChildByDeptId(deptId)) { return warn(...); }"
+      }
+    },
+    {
+      "name": "部门存在用户时禁止删除",
+      "domain": "组织与权限管理",
+      "rule_type": "validation",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "部门下仍有关联用户时不得删除。",
+      "status_change": "",
+      "data_change": "",
+      "follow_up": "",
+      "exception": "返回部门存在用户警告",
+      "impact": "组织与权限管理",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysDeptController.remove(@PathVariable Long deptId)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysDeptController.java",
+        "lines": [
+          140,
+          143
+        ],
+        "snippet": "if (deptService.checkDeptExistUser(deptId)) { return warn(...); }"
+      }
+    },
+    {
+      "name": "删除部门前再次校验数据范围",
+      "domain": "组织与权限管理",
+      "rule_type": "permission",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "具备 system:dept:remove 权限且无下级、无用户",
+      "logic": "通过子部门和用户关联检查后，仍须通过数据范围检查才执行删除。",
+      "status_change": "",
+      "data_change": "删除 sys_dept 记录",
+      "follow_up": "",
+      "exception": "",
+      "impact": "组织与权限管理",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysDeptController.remove(@PathVariable Long deptId)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysDeptController.java",
+        "lines": [
+          144,
+          145
+        ],
+        "snippet": "checkDeptDataScope(deptId); deleteDeptById(deptId)"
+      }
+    },
+    {
+      "name": "不存在的字典类型返回空列表",
+      "domain": "系统配置与字典",
+      "rule_type": "exception",
+      "trigger": "按字典类型查询数据",
+      "pre_condition": "",
+      "logic": "按类型查询字典数据返回 null 时转换为空列表，保持响应结构稳定。",
+      "status_change": "",
+      "data_change": "",
+      "follow_up": "",
+      "exception": "",
+      "impact": "系统配置与字典",
+      "confidence": 98,
+      "source_method": "com.ruoyi.web.controller.system.SysDictDataController.dictType(@PathVariable String dictType)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysDictDataController.java",
+        "lines": [
+          78,
+          83
+        ],
+        "snippet": "if (StringUtils.isNull(data)) { data = new ArrayList<>(); }"
+      }
+    },
+    {
+      "name": "新增字典类型必须唯一",
+      "domain": "系统配置与字典",
+      "rule_type": "validation",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "新增字典前校验类型编码唯一；重复则拒绝。",
+      "status_change": "",
+      "data_change": "成功时写入 sys_dict_type 并记录创建人",
+      "follow_up": "",
+      "exception": "",
+      "impact": "系统配置与字典",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysDictTypeController.add(@Validated @RequestBody SysDictType dict)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysDictTypeController.java",
+        "lines": [
+          74,
+          79
+        ],
+        "snippet": "if (!checkDictTypeUnique(dict)) { return error(...); }"
+      }
+    },
+    {
+      "name": "刷新数据字典缓存",
+      "domain": "系统配置与字典",
+      "rule_type": "trigger",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "具备 system:dict:remove 权限",
+      "logic": "具备字典删除权限的请求可触发字典缓存重置。",
+      "status_change": "",
+      "data_change": "重建字典缓存",
+      "follow_up": "",
+      "exception": "",
+      "impact": "系统配置与字典",
+      "confidence": 98,
+      "source_method": "com.ruoyi.web.controller.system.SysDictTypeController.refreshCache()",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysDictTypeController.java",
+        "lines": [
+          113,
+          119
+        ],
+        "snippet": "@PreAuthorize(...remove...); dictTypeService.resetDictCache();"
+      }
+    },
+    {
+      "name": "解锁屏幕密码不能为空",
+      "domain": "身份认证与账号安全",
+      "rule_type": "validation",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "解锁屏幕必须提交非空密码。",
+      "status_change": "",
+      "data_change": "",
+      "follow_up": "",
+      "exception": "空密码直接返回错误",
+      "impact": "身份认证与账号安全",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysIndexController.unlockScreen(@RequestBody Map<String, String> body)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysIndexController.java",
+        "lines": [
+          46,
+          50
+        ],
+        "snippet": "if (StringUtils.isEmpty(password)) { return AjaxResult.error(\"密码不能为空\"); }"
+      }
+    },
+    {
+      "name": "解锁时找不到当前用户要求重新登录",
+      "domain": "身份认证与账号安全",
+      "rule_type": "exception",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "按当前用户名查不到用户时不继续校验密码，要求重新登录。",
+      "status_change": "",
+      "data_change": "",
+      "follow_up": "",
+      "exception": "",
+      "impact": "身份认证与账号安全",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysIndexController.unlockScreen(@RequestBody Map<String, String> body)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysIndexController.java",
+        "lines": [
+          51,
+          56
+        ],
+        "snippet": "if (user == null) { return AjaxResult.error(\"服务器超时，请重新登录\"); }"
+      }
+    },
+    {
+      "name": "解锁密码必须匹配当前账号",
+      "domain": "身份认证与账号安全",
+      "rule_type": "validation",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "只有输入密码与当前用户密码哈希匹配时才返回解锁成功。",
+      "status_change": "",
+      "data_change": "",
+      "follow_up": "",
+      "exception": "密码不匹配时要求重新输入",
+      "impact": "身份认证与账号安全",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysIndexController.unlockScreen(@RequestBody Map<String, String> body)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysIndexController.java",
+        "lines": [
+          57,
+          62
+        ],
+        "snippet": "if (!matchesPassword(...)) return error; else success"
+      }
+    },
+    {
+      "name": "登录成功签发访问令牌",
+      "domain": "身份认证与账号安全",
+      "rule_type": "trigger",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "使用用户名、密码、验证码和 UUID 完成登录后，把生成的令牌放入响应。",
+      "status_change": "未认证 → 已签发令牌",
+      "data_change": "",
+      "follow_up": "客户端使用令牌访问受保护资源",
+      "exception": "",
+      "impact": "身份认证与账号安全",
+      "confidence": 97,
+      "source_method": "com.ruoyi.web.controller.system.SysLoginController.login(@RequestBody LoginBody loginBody)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysLoginController.java",
+        "lines": [
+          59,
+          64
+        ],
+        "snippet": "login(username,password,code,uuid); ajax.put(TOKEN, token)"
+      }
+    },
+    {
+      "name": "菜单权限变化时刷新登录令牌权限",
+      "domain": "身份认证与账号安全",
+      "rule_type": "trigger",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "获取用户信息时重算角色与菜单权限；如权限集合变化，更新登录用户并刷新令牌缓存。",
+      "status_change": "",
+      "data_change": "更新登录会话中的权限集合",
+      "follow_up": "",
+      "exception": "",
+      "impact": "身份认证与账号安全",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysLoginController.getInfo()",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysLoginController.java",
+        "lines": [
+          75,
+          85
+        ],
+        "snippet": "若缓存 permissions 与最新权限不同，则 setPermissions 并 refreshToken"
+      }
+    },
+    {
+      "name": "初始密码未修改提醒规则",
+      "domain": "身份认证与账号安全",
+      "rule_type": "status",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "仅当启用初始密码提醒且用户从未更新密码时，标记需要修改初始密码。",
+      "status_change": "密码提醒标志置为 true",
+      "data_change": "",
+      "follow_up": "",
+      "exception": "",
+      "impact": "身份认证与账号安全",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysLoginController.initPasswordIsModify(Date pwdUpdateDate)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysLoginController.java",
+        "lines": [
+          116,
+          119
+        ],
+        "snippet": "配置值为1且 pwdUpdateDate 为 null 时返回 true"
+      }
+    },
+    {
+      "name": "从未修改密码视为已过期",
+      "domain": "身份认证与账号安全",
+      "rule_type": "status",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "sys.account.passwordValidateDays > 0",
+      "logic": "启用密码有效期后，缺少密码更新时间的账号直接被标记为密码过期。",
+      "status_change": "密码状态 → 过期",
+      "data_change": "",
+      "follow_up": "",
+      "exception": "",
+      "impact": "身份认证与账号安全",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysLoginController.passwordIsExpiration(Date pwdUpdateDate)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysLoginController.java",
+        "lines": [
+          125,
+          132
+        ],
+        "snippet": "有效期大于0且 pwdUpdateDate 为 null 时 return true"
+      }
+    },
+    {
+      "name": "密码超过配置天数判定过期",
+      "domain": "身份认证与账号安全",
+      "rule_type": "calculation",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "已配置正数有效期且存在密码更新时间",
+      "logic": "当前日期与密码更新时间的毫秒差换算天数，严格大于配置有效天数时判定过期。",
+      "status_change": "有效 → 过期",
+      "data_change": "",
+      "follow_up": "",
+      "exception": "",
+      "impact": "身份认证与账号安全",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysLoginController.passwordIsExpiration(Date pwdUpdateDate)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysLoginController.java",
+        "lines": [
+          133,
+          135
+        ],
+        "snippet": "当前日期与更新时间相差天数 > passwordValidateDays"
+      }
+    },
+    {
+      "name": "菜单列表按当前用户过滤",
+      "domain": "组织与权限管理",
+      "rule_type": "permission",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "查询菜单需要列表权限，并把当前用户 ID 传入服务以限定可见菜单。",
+      "status_change": "",
+      "data_change": "",
+      "follow_up": "",
+      "exception": "",
+      "impact": "组织与权限管理",
+      "confidence": 98,
+      "source_method": "com.ruoyi.web.controller.system.SysMenuController.list(SysMenu menu)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysMenuController.java",
+        "lines": [
+          40,
+          45
+        ],
+        "snippet": "@PreAuthorize(system:menu:list); selectMenuList(menu, getUserId())"
+      }
+    },
+    {
+      "name": "新增菜单名称必须唯一",
+      "domain": "组织与权限管理",
+      "rule_type": "validation",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "菜单名称重复时拒绝新增。",
+      "status_change": "",
+      "data_change": "",
+      "follow_up": "",
+      "exception": "",
+      "impact": "组织与权限管理",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysMenuController.add(@Validated @RequestBody SysMenu menu)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysMenuController.java",
+        "lines": [
+          89,
+          92
+        ],
+        "snippet": "if (!checkMenuNameUnique(menu)) { return error(...); }"
+      }
+    },
+    {
+      "name": "外链菜单地址必须使用 HTTP(S)",
+      "domain": "组织与权限管理",
+      "rule_type": "validation",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "isFrame 表示外链",
+      "logic": "菜单配置为外链时，地址必须以 http:// 或 https:// 开头。",
+      "status_change": "",
+      "data_change": "",
+      "follow_up": "",
+      "exception": "",
+      "impact": "组织与权限管理",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysMenuController.add(@Validated @RequestBody SysMenu menu)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysMenuController.java",
+        "lines": [
+          93,
+          96
+        ],
+        "snippet": "YES_FRAME 且 !StringUtils.ishttp(path) 时拒绝"
+      }
+    },
+    {
+      "name": "菜单路由名称或地址必须唯一",
+      "domain": "组织与权限管理",
+      "rule_type": "validation",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "新增菜单的路由名称或地址与现有配置重复时拒绝。",
+      "status_change": "",
+      "data_change": "",
+      "follow_up": "",
+      "exception": "",
+      "impact": "组织与权限管理",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysMenuController.add(@Validated @RequestBody SysMenu menu)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysMenuController.java",
+        "lines": [
+          97,
+          102
+        ],
+        "snippet": "if (!checkRouteConfigUnique(menu)) { return error(...); }"
+      }
+    },
+    {
+      "name": "上级菜单不能选择自身",
+      "domain": "组织与权限管理",
+      "rule_type": "validation",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "修改菜单时 parentId 不得等于 menuId。",
+      "status_change": "",
+      "data_change": "",
+      "follow_up": "",
+      "exception": "",
+      "impact": "组织与权限管理",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysMenuController.edit(@Validated @RequestBody SysMenu menu)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysMenuController.java",
+        "lines": [
+          121,
+          130
+        ],
+        "snippet": "menuId.equals(parentId) 时拒绝，否则更新"
+      }
+    },
+    {
+      "name": "存在子菜单时禁止删除",
+      "domain": "组织与权限管理",
+      "rule_type": "validation",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "菜单仍有子节点时禁止删除。",
+      "status_change": "",
+      "data_change": "",
+      "follow_up": "",
+      "exception": "",
+      "impact": "组织与权限管理",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysMenuController.remove(@PathVariable(\"menuId\") Long menuId)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysMenuController.java",
+        "lines": [
+          155,
+          158
+        ],
+        "snippet": "if (hasChildByMenuId(menuId)) return warn"
+      }
+    },
+    {
+      "name": "已分配给角色的菜单禁止删除",
+      "domain": "组织与权限管理",
+      "rule_type": "validation",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "菜单仍被角色引用时禁止删除。",
+      "status_change": "",
+      "data_change": "",
+      "follow_up": "",
+      "exception": "",
+      "impact": "组织与权限管理",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysMenuController.remove(@PathVariable(\"menuId\") Long menuId)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysMenuController.java",
+        "lines": [
+          159,
+          163
+        ],
+        "snippet": "if (checkMenuExistRole(menuId)) return warn"
+      }
+    },
+    {
+      "name": "首页公告最多返回五条",
+      "domain": "通知公告",
+      "rule_type": "calculation",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "首页按当前用户查询带已读标记的正常公告，固定上限为 5 条。",
+      "status_change": "",
+      "data_change": "",
+      "follow_up": "",
+      "exception": "",
+      "impact": "通知公告",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysNoticeController.listTop()",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysNoticeController.java",
+        "lines": [
+          91,
+          98
+        ],
+        "snippet": "selectNoticeListWithReadStatus(userId, 5)"
+      }
+    },
+    {
+      "name": "首页公告计算未读数量",
+      "domain": "通知公告",
+      "rule_type": "calculation",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "对返回的最多五条公告按 isRead=false 计数，并将 unreadCount 放入响应。",
+      "status_change": "",
+      "data_change": "",
+      "follow_up": "",
+      "exception": "",
+      "impact": "通知公告",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysNoticeController.listTop()",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysNoticeController.java",
+        "lines": [
+          93,
+          98
+        ],
+        "snippet": "list.stream().filter(n -> !n.getIsRead()).count()"
+      }
+    },
+    {
+      "name": "公告阅读状态按当前用户记录",
+      "domain": "通知公告",
+      "rule_type": "status",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "标记公告已读时同时使用公告 ID 和当前用户 ID，阅读状态是用户维度的。",
+      "status_change": "未读 → 已读",
+      "data_change": "写入或更新 sys_notice_read",
+      "follow_up": "",
+      "exception": "",
+      "impact": "通知公告",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysNoticeController.markRead(Long noticeId)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysNoticeController.java",
+        "lines": [
+          106,
+          110
+        ],
+        "snippet": "markRead(noticeId, getUserId())"
+      }
+    },
+    {
+      "name": "删除公告联动删除阅读记录",
+      "domain": "通知公告",
+      "rule_type": "trigger",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "删除公告前先删除对应用户阅读记录，再删除公告主体。",
+      "status_change": "",
+      "data_change": "删除 sys_notice_read 后删除 sys_notice",
+      "follow_up": "",
+      "exception": "",
+      "impact": "通知公告",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysNoticeController.remove(@PathVariable Long[] noticeIds)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysNoticeController.java",
+        "lines": [
+          145,
+          148
+        ],
+        "snippet": "先 deleteByNoticeIds，再 deleteNoticeByIds"
+      }
+    },
+    {
+      "name": "岗位名称与编码均须唯一",
+      "domain": "组织与权限管理",
+      "rule_type": "validation",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "新增岗位依次校验岗位名称和岗位编码唯一；任一重复均拒绝写入。",
+      "status_change": "",
+      "data_change": "成功时写入 sys_post 并记录创建人",
+      "follow_up": "",
+      "exception": "",
+      "impact": "组织与权限管理",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysPostController.add(@Validated @RequestBody SysPost post)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysPostController.java",
+        "lines": [
+          77,
+          86
+        ],
+        "snippet": "先 checkPostNameUnique，再 checkPostCodeUnique"
+      }
+    },
+    {
+      "name": "个人资料手机号和邮箱必须唯一",
+      "domain": "身份认证与账号安全",
+      "rule_type": "validation",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "修改个人资料时，非空手机号和邮箱都必须在用户范围内唯一。",
+      "status_change": "",
+      "data_change": "",
+      "follow_up": "",
+      "exception": "重复手机号或邮箱时返回修改失败",
+      "impact": "身份认证与账号安全",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysProfileController.updateProfile(@RequestBody SysUser user)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysProfileController.java",
+        "lines": [
+          67,
+          78
+        ],
+        "snippet": "非空手机号/邮箱分别执行唯一性检查"
+      }
+    },
+    {
+      "name": "个人资料更新后刷新登录缓存",
+      "domain": "身份认证与账号安全",
+      "rule_type": "trigger",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "数据库资料更新成功后同步更新缓存中的登录用户；失败则返回异常。",
+      "status_change": "",
+      "data_change": "更新 sys_user 与登录会话缓存",
+      "follow_up": "",
+      "exception": "",
+      "impact": "身份认证与账号安全",
+      "confidence": 98,
+      "source_method": "com.ruoyi.web.controller.system.SysProfileController.updateProfile(@RequestBody SysUser user)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysProfileController.java",
+        "lines": [
+          79,
+          85
+        ],
+        "snippet": "updateUserProfile 成功后 tokenService.setLoginUser(loginUser)"
+      }
+    },
+    {
+      "name": "修改密码必须验证旧密码",
+      "domain": "身份认证与账号安全",
+      "rule_type": "validation",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "只有旧密码与当前密码匹配时才能继续修改。",
+      "status_change": "",
+      "data_change": "",
+      "follow_up": "",
+      "exception": "",
+      "impact": "身份认证与账号安全",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysProfileController.updatePwd(@RequestBody Map<String, String> params)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysProfileController.java",
+        "lines": [
+          95,
+          104
+        ],
+        "snippet": "!matchesPassword(oldPassword,password) 时拒绝"
+      }
+    },
+    {
+      "name": "新密码不能与旧密码相同",
+      "domain": "身份认证与账号安全",
+      "rule_type": "validation",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "新密码若仍匹配当前密码哈希则拒绝修改。",
+      "status_change": "",
+      "data_change": "",
+      "follow_up": "",
+      "exception": "",
+      "impact": "身份认证与账号安全",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysProfileController.updatePwd(@RequestBody Map<String, String> params)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysProfileController.java",
+        "lines": [
+          105,
+          108
+        ],
+        "snippet": "matchesPassword(newPassword,password) 时拒绝"
+      }
+    },
+    {
+      "name": "修改密码后同步更新时间和登录缓存",
+      "domain": "身份认证与账号安全",
+      "rule_type": "status",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "新密码加密落库成功后，更新缓存用户的密码更新时间与密码哈希。",
+      "status_change": "密码已更新且更新时间刷新",
+      "data_change": "更新 sys_user 与登录会话缓存",
+      "follow_up": "",
+      "exception": "",
+      "impact": "身份认证与账号安全",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysProfileController.updatePwd(@RequestBody Map<String, String> params)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysProfileController.java",
+        "lines": [
+          109,
+          116
+        ],
+        "snippet": "重置成功后设置 pwdUpdateDate、password 并 setLoginUser"
+      }
+    },
+    {
+      "name": "头像上传仅接受非空图片扩展名",
+      "domain": "身份认证与账号安全",
+      "rule_type": "validation",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "头像文件必须非空，并通过图片扩展名白名单上传。",
+      "status_change": "",
+      "data_change": "",
+      "follow_up": "",
+      "exception": "",
+      "impact": "身份认证与账号安全",
+      "confidence": 98,
+      "source_method": "com.ruoyi.web.controller.system.SysProfileController.avatar(@RequestParam(\"avatarfile\") MultipartFile file)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysProfileController.java",
+        "lines": [
+          128,
+          131
+        ],
+        "snippet": "非空文件使用 IMAGE_EXTENSION 白名单上传"
+      }
+    },
+    {
+      "name": "头像更新后删除旧头像并刷新缓存",
+      "domain": "身份认证与账号安全",
+      "rule_type": "trigger",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "新头像写入用户记录成功后，若存在旧头像则删除旧文件，并同步登录缓存。",
+      "status_change": "",
+      "data_change": "更新用户头像、删除旧文件、刷新会话缓存",
+      "follow_up": "",
+      "exception": "",
+      "impact": "身份认证与账号安全",
+      "confidence": 98,
+      "source_method": "com.ruoyi.web.controller.system.SysProfileController.avatar(@RequestParam(\"avatarfile\") MultipartFile file)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysProfileController.java",
+        "lines": [
+          132,
+          143
+        ],
+        "snippet": "更新新头像成功后删除旧文件并 setLoginUser"
+      }
+    },
+    {
+      "name": "角色名称和权限字符必须唯一",
+      "domain": "组织与权限管理",
+      "rule_type": "validation",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "新增角色时，角色名称和权限字符任一重复都拒绝写入。",
+      "status_change": "",
+      "data_change": "成功时写入 sys_role 并记录创建人",
+      "follow_up": "",
+      "exception": "",
+      "impact": "组织与权限管理",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysRoleController.add(@Validated @RequestBody SysRole role)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysRoleController.java",
+        "lines": [
+          94,
+          103
+        ],
+        "snippet": "依次检查 roleName 与 roleKey 唯一性"
+      }
+    },
+    {
+      "name": "修改角色必须通过允许操作和数据范围检查",
+      "domain": "组织与权限管理",
+      "rule_type": "permission",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "具备 system:role:edit 权限",
+      "logic": "角色修改前先校验该角色允许被操作，且当前用户拥有目标角色的数据范围。",
+      "status_change": "",
+      "data_change": "",
+      "follow_up": "",
+      "exception": "",
+      "impact": "组织与权限管理",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysRoleController.edit(@Validated @RequestBody SysRole role)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysRoleController.java",
+        "lines": [
+          113,
+          123
+        ],
+        "snippet": "checkRoleAllowed(role); checkRoleDataScope(roleId)"
+      }
+    },
+    {
+      "name": "角色修改成功后刷新在线用户权限",
+      "domain": "组织与权限管理",
+      "rule_type": "trigger",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "角色更新成功后，刷新所有持有该角色的在线用户权限。",
+      "status_change": "",
+      "data_change": "更新角色并刷新相关登录会话权限",
+      "follow_up": "",
+      "exception": "",
+      "impact": "组织与权限管理",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysRoleController.edit(@Validated @RequestBody SysRole role)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysRoleController.java",
+        "lines": [
+          125,
+          133
+        ],
+        "snippet": "updateRole 成功后 refreshPermissionByRoleId"
+      }
+    },
+    {
+      "name": "修改角色数据权限前校验角色边界",
+      "domain": "组织与权限管理",
+      "rule_type": "permission",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "具备 system:role:edit 权限",
+      "logic": "授权数据范围前必须通过角色可操作性和当前数据范围检查。",
+      "status_change": "",
+      "data_change": "更新 sys_role_dept 或角色数据范围",
+      "follow_up": "",
+      "exception": "",
+      "impact": "组织与权限管理",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysRoleController.dataScope(@RequestBody SysRole role)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysRoleController.java",
+        "lines": [
+          139,
+          146
+        ],
+        "snippet": "checkRoleAllowed; checkRoleDataScope; authDataScope"
+      }
+    },
+    {
+      "name": "角色状态变更受角色边界约束",
+      "domain": "组织与权限管理",
+      "rule_type": "status",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "角色启停前校验允许操作和数据范围，再记录修改人并更新状态。",
+      "status_change": "角色正常/停用状态切换",
+      "data_change": "",
+      "follow_up": "",
+      "exception": "",
+      "impact": "组织与权限管理",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysRoleController.changeStatus(@RequestBody SysRole role)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysRoleController.java",
+        "lines": [
+          152,
+          160
+        ],
+        "snippet": "checkRoleAllowed; checkRoleDataScope; updateRoleStatus"
+      }
+    },
+    {
+      "name": "批量给用户授权角色前校验角色数据范围",
+      "domain": "组织与权限管理",
+      "rule_type": "permission",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "批量授权用户前，当前用户必须拥有目标角色的数据范围。",
+      "status_change": "",
+      "data_change": "新增 sys_user_role 关系",
+      "follow_up": "",
+      "exception": "",
+      "impact": "组织与权限管理",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysRoleController.selectAuthUserAll(Long roleId, Long[] userIds)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysRoleController.java",
+        "lines": [
+          233,
+          239
+        ],
+        "snippet": "checkRoleDataScope(roleId); insertAuthUsers(roleId,userIds)"
+      }
+    },
+    {
+      "name": "用户详情按数据范围并隐藏管理员角色",
+      "domain": "组织与权限管理",
+      "rule_type": "permission",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "具备 system:user:query 权限",
+      "logic": "查看指定用户先检查用户数据范围；目标不是管理员时，候选角色中排除管理员角色。",
+      "status_change": "",
+      "data_change": "",
+      "follow_up": "",
+      "exception": "",
+      "impact": "组织与权限管理",
+      "confidence": 98,
+      "source_method": "com.ruoyi.web.controller.system.SysUserController.getInfo(@PathVariable(value = \"userId\", required = false) Long userId)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysUserController.java",
+        "lines": [
+          104,
+          115
+        ],
+        "snippet": "有 userId 时检查数据范围；非管理员目标过滤管理员角色"
+      }
+    },
+    {
+      "name": "新增用户前校验部门和角色数据范围",
+      "domain": "组织与权限管理",
+      "rule_type": "permission",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "具备 system:user:add 权限",
+      "logic": "新增用户前，当前操作者必须同时拥有目标部门和所选角色的数据范围。",
+      "status_change": "",
+      "data_change": "",
+      "follow_up": "",
+      "exception": "",
+      "impact": "组织与权限管理",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysUserController.add(@Validated @RequestBody SysUser user)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysUserController.java",
+        "lines": [
+          125,
+          128
+        ],
+        "snippet": "checkDeptDataScope(deptId); checkRoleDataScope(roleIds)"
+      }
+    },
+    {
+      "name": "新增用户账号、手机号和邮箱必须唯一",
+      "domain": "组织与权限管理",
+      "rule_type": "validation",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "登录账号必须唯一；非空手机号和邮箱也必须唯一，任一冲突均拒绝新增。",
+      "status_change": "",
+      "data_change": "",
+      "follow_up": "",
+      "exception": "",
+      "impact": "组织与权限管理",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysUserController.add(@Validated @RequestBody SysUser user)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysUserController.java",
+        "lines": [
+          129,
+          140
+        ],
+        "snippet": "依次校验 userName、非空 phone、非空 email 唯一"
+      }
+    },
+    {
+      "name": "新增用户密码加密后落库",
+      "domain": "身份认证与账号安全",
+      "rule_type": "trigger",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "所有新增校验通过后，先加密明文密码，再写入用户。",
+      "status_change": "",
+      "data_change": "sys_user 保存密码哈希而非提交的明文",
+      "follow_up": "",
+      "exception": "",
+      "impact": "身份认证与账号安全",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysUserController.add(@Validated @RequestBody SysUser user)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysUserController.java",
+        "lines": [
+          141,
+          143
+        ],
+        "snippet": "setCreateBy; setPassword(encryptPassword(...)); insertUser"
+      }
+    },
+    {
+      "name": "修改用户受用户、部门和角色数据范围约束",
+      "domain": "组织与权限管理",
+      "rule_type": "permission",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "具备 system:user:edit 权限",
+      "logic": "修改用户前依次校验用户可操作性、用户数据范围、目标部门范围和目标角色范围。",
+      "status_change": "",
+      "data_change": "",
+      "follow_up": "",
+      "exception": "",
+      "impact": "组织与权限管理",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysUserController.edit(@Validated @RequestBody SysUser user)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysUserController.java",
+        "lines": [
+          152,
+          157
+        ],
+        "snippet": "checkUserAllowed; checkUserDataScope; checkDeptDataScope; checkRoleDataScope"
+      }
+    },
+    {
+      "name": "当前登录用户不能删除自己",
+      "domain": "组织与权限管理",
+      "rule_type": "validation",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "批量删除名单包含当前登录用户时，整次删除请求被拒绝。",
+      "status_change": "",
+      "data_change": "",
+      "follow_up": "",
+      "exception": "",
+      "impact": "组织与权限管理",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysUserController.remove(@PathVariable Long[] userIds)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysUserController.java",
+        "lines": [
+          180,
+          186
+        ],
+        "snippet": "userIds 包含 getUserId() 时返回错误"
+      }
+    },
+    {
+      "name": "管理员重置用户密码需校验用户边界并加密",
+      "domain": "身份认证与账号安全",
+      "rule_type": "permission",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "具备 system:user:resetPwd 权限",
+      "logic": "重置密码前检查目标用户允许被操作且在数据范围内，然后加密新密码并记录修改人。",
+      "status_change": "",
+      "data_change": "更新 sys_user 密码哈希",
+      "follow_up": "",
+      "exception": "",
+      "impact": "身份认证与账号安全",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysUserController.resetPwd(@RequestBody SysUser user)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysUserController.java",
+        "lines": [
+          195,
+          201
+        ],
+        "snippet": "checkUserAllowed; checkUserDataScope; encryptPassword; resetPwd"
+      }
+    },
+    {
+      "name": "用户状态变更受用户边界约束",
+      "domain": "组织与权限管理",
+      "rule_type": "status",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "启停用户前检查用户可操作性和数据范围，再记录修改人并更新状态。",
+      "status_change": "用户正常/停用状态切换",
+      "data_change": "",
+      "follow_up": "",
+      "exception": "",
+      "impact": "组织与权限管理",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysUserController.changeStatus(@RequestBody SysUser user)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysUserController.java",
+        "lines": [
+          207,
+          215
+        ],
+        "snippet": "checkUserAllowed; checkUserDataScope; updateUserStatus"
+      }
+    },
+    {
+      "name": "用户授权角色需同时校验用户和角色范围",
+      "domain": "组织与权限管理",
+      "rule_type": "permission",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "给用户分配角色前，操作者必须同时拥有目标用户和所有目标角色的数据范围。",
+      "status_change": "",
+      "data_change": "重建或更新 sys_user_role 关系",
+      "follow_up": "",
+      "exception": "",
+      "impact": "组织与权限管理",
+      "confidence": 99,
+      "source_method": "com.ruoyi.web.controller.system.SysUserController.insertAuthRole(Long userId, Long[] roleIds)",
+      "evidence": {
+        "file": "ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysUserController.java",
+        "lines": [
+          236,
+          244
+        ],
+        "snippet": "checkUserDataScope(userId); checkRoleDataScope(roleIds); insertUserAuth"
+      }
+    },
+    {
+      "name": "定时任务 Cron 表达式必须有效",
+      "domain": "作业调度",
+      "rule_type": "validation",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "新增定时任务前必须通过 Cron 表达式语法校验。",
+      "status_change": "",
+      "data_change": "",
+      "follow_up": "",
+      "exception": "",
+      "impact": "作业调度",
+      "confidence": 99,
+      "source_method": "com.ruoyi.quartz.controller.SysJobController.add(@RequestBody SysJob job)",
+      "evidence": {
+        "file": "ruoyi-quartz/src/main/java/com/ruoyi/quartz/controller/SysJobController.java",
+        "lines": [
+          85,
+          88
+        ],
+        "snippet": "if (!CronUtils.isValid(cronExpression)) return error"
+      }
+    },
+    {
+      "name": "定时任务调用目标禁止危险协议并要求白名单",
+      "domain": "作业调度",
+      "rule_type": "validation",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "任务调用目标不得包含远程查找或 HTTP(S) 协议、违规字符串，且最终必须命中调度白名单。",
+      "status_change": "",
+      "data_change": "",
+      "follow_up": "",
+      "exception": "任一检查失败立即拒绝新增",
+      "impact": "作业调度",
+      "confidence": 99,
+      "source_method": "com.ruoyi.quartz.controller.SysJobController.add(@RequestBody SysJob job)",
+      "evidence": {
+        "file": "ruoyi-quartz/src/main/java/com/ruoyi/quartz/controller/SysJobController.java",
+        "lines": [
+          89,
+          107
+        ],
+        "snippet": "依次拒绝 rmi、ldap(s)、http(s)、违规字符串及非白名单目标"
+      }
+    },
+    {
+      "name": "定时任务状态修改以数据库任务为准",
+      "domain": "作业调度",
+      "rule_type": "status",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "状态修改先按任务 ID 重新加载数据库任务，仅把请求状态赋给加载结果后执行变更。",
+      "status_change": "任务正常/暂停状态切换",
+      "data_change": "",
+      "follow_up": "",
+      "exception": "",
+      "impact": "作业调度",
+      "confidence": 99,
+      "source_method": "com.ruoyi.quartz.controller.SysJobController.changeStatus(@RequestBody SysJob job)",
+      "evidence": {
+        "file": "ruoyi-quartz/src/main/java/com/ruoyi/quartz/controller/SysJobController.java",
+        "lines": [
+          155,
+          159
+        ],
+        "snippet": "selectJobById 后只复制请求 status，再 changeStatus"
+      }
+    },
+    {
+      "name": "立即执行不存在或过期任务返回错误",
+      "domain": "作业调度",
+      "rule_type": "exception",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "立即执行返回 false 时不报告成功，而是明确提示任务不存在或已经过期。",
+      "status_change": "",
+      "data_change": "",
+      "follow_up": "",
+      "exception": "",
+      "impact": "作业调度",
+      "confidence": 99,
+      "source_method": "com.ruoyi.quartz.controller.SysJobController.run(@RequestBody SysJob job)",
+      "evidence": {
+        "file": "ruoyi-quartz/src/main/java/com/ruoyi/quartz/controller/SysJobController.java",
+        "lines": [
+          168,
+          171
+        ],
+        "snippet": "run(job) 为 false 时返回“任务不存在或已过期”"
+      }
+    },
+    {
+      "name": "创建数据库表仅允许管理员",
+      "domain": "代码生成",
+      "rule_type": "permission",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "通过 SQL 创建表结构的接口仅允许 admin 角色调用。",
+      "status_change": "",
+      "data_change": "可能创建数据库表并导入生成元数据",
+      "follow_up": "",
+      "exception": "",
+      "impact": "代码生成",
+      "confidence": 99,
+      "source_method": "com.ruoyi.generator.controller.GenController.createTableSave(@RequestParam(\"sql\") String sql, @RequestParam(\"tplWebType\") String tplWebType)",
+      "evidence": {
+        "file": "ruoyi-generator/src/main/java/com/ruoyi/generator/controller/GenController.java",
+        "lines": [
+          128,
+          153
+        ],
+        "snippet": "@PreAuthorize(\"@ss.hasRole('admin')\")"
+      }
+    },
+    {
+      "name": "建表接口只处理 MySQL CREATE TABLE 并导入成功表",
+      "domain": "代码生成",
+      "rule_type": "trigger",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "输入 SQL 先做关键字过滤和 MySQL 解析，只对 CREATE TABLE 语句建表，并把成功创建的表导入代码生成元数据。",
+      "status_change": "",
+      "data_change": "创建表并写入 gen_table/gen_table_column",
+      "follow_up": "",
+      "exception": "任何异常统一返回创建表结构异常",
+      "impact": "代码生成",
+      "confidence": 98,
+      "source_method": "com.ruoyi.generator.controller.GenController.createTableSave(@RequestParam(\"sql\") String sql, @RequestParam(\"tplWebType\") String tplWebType)",
+      "evidence": {
+        "file": "ruoyi-generator/src/main/java/com/ruoyi/generator/controller/GenController.java",
+        "lines": [
+          133,
+          153
+        ],
+        "snippet": "过滤关键字、解析 SQL；仅处理 MySqlCreateTableStatement；成功表再导入"
+      }
+    },
+    {
+      "name": "系统预设禁止覆盖时不得生成到本地",
+      "domain": "代码生成",
+      "rule_type": "validation",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "自定义路径生成代码前检查覆盖开关；系统预设不允许覆盖时拒绝写入本地。",
+      "status_change": "",
+      "data_change": "允许时生成文件到配置路径",
+      "follow_up": "",
+      "exception": "",
+      "impact": "代码生成",
+      "confidence": 99,
+      "source_method": "com.ruoyi.generator.controller.GenController.genCode(@PathVariable(\"tableName\") String tableName)",
+      "evidence": {
+        "file": "ruoyi-generator/src/main/java/com/ruoyi/generator/controller/GenController.java",
+        "lines": [
+          216,
+          223
+        ],
+        "snippet": "if (!GenConfig.isAllowOverwrite()) return error"
+      }
+    },
+    {
+      "name": "非管理员及无登录上下文时敏感字段脱敏",
+      "domain": "平台公共机制",
+      "rule_type": "permission",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "管理员查看敏感字段不脱敏；非管理员脱敏；无法取得登录上下文时按安全默认值执行脱敏。",
+      "status_change": "",
+      "data_change": "",
+      "follow_up": "",
+      "exception": "",
+      "impact": "平台公共机制",
+      "confidence": 99,
+      "source_method": "com.ruoyi.common.config.serializer.SensitiveJsonSerializer.desensitization()",
+      "evidence": {
+        "file": "ruoyi-common/src/main/java/com/ruoyi/common/config/serializer/SensitiveJsonSerializer.java",
+        "lines": [
+          64,
+          75
+        ],
+        "snippet": "管理员返回 false；非管理员返回 true；异常时返回 true"
+      }
+    },
+    {
+      "name": "前端排序方向映射为数据库排序值",
+      "domain": "平台公共机制",
+      "rule_type": "other",
+      "trigger": "调用对应接口或方法",
+      "pre_condition": "",
+      "logic": "非空排序方向中，前端 ascending/descending 分别标准化为 asc/desc 后保存。",
+      "status_change": "",
+      "data_change": "规范化分页排序参数",
+      "follow_up": "",
+      "exception": "",
+      "impact": "平台公共机制",
+      "confidence": 99,
+      "source_method": "com.ruoyi.common.core.page.PageDomain.setIsAsc(String isAsc)",
+      "evidence": {
+        "file": "ruoyi-common/src/main/java/com/ruoyi/common/core/page/PageDomain.java",
+        "lines": [
+          71,
+          85
+        ],
+        "snippet": "ascending 映射 asc；descending 映射 desc"
+      }
+    }
+  ],
+  "flows": [
+    {
+      "name": "用户登录与权限刷新",
+      "description": "认证成功签发令牌，并在读取用户信息时重算权限、必要时刷新会话。",
+      "entry_method": "com.ruoyi.web.controller.system.SysLoginController.login(@RequestBody LoginBody loginBody)",
+      "business_steps": [
+        "提交账号、密码和验证码",
+        "完成认证并签发令牌",
+        "获取用户与角色权限",
+        "权限变化时刷新登录会话",
+        "返回密码提醒与过期状态"
+      ],
+      "tech_steps": [
+        "SysLoginController.login",
+        "SysLoginService.login",
+        "TokenService",
+        "SysLoginController.getInfo",
+        "SysPermissionService"
+      ],
+      "confidence": 93
+    },
+    {
+      "name": "部门维护",
+      "description": "在权限、唯一性、树形层级和关联用户约束下维护组织部门。",
+      "entry_method": "com.ruoyi.web.controller.system.SysDeptController.add(@Validated @RequestBody SysDept dept)",
+      "business_steps": [
+        "校验部门名称",
+        "记录创建人并新增",
+        "修改时检查数据范围与层级",
+        "停用时检查正常子部门",
+        "删除时检查子部门和用户"
+      ],
+      "tech_steps": [
+        "SysDeptController",
+        "ISysDeptService",
+        "sys_dept"
+      ],
+      "confidence": 96
+    },
+    {
+      "name": "用户新增与授权",
+      "description": "在部门与角色范围内创建用户，加密密码并维护角色关系。",
+      "entry_method": "com.ruoyi.web.controller.system.SysUserController.add(@Validated @RequestBody SysUser user)",
+      "business_steps": [
+        "校验部门和角色数据范围",
+        "校验账号、手机和邮箱唯一",
+        "加密初始密码",
+        "保存用户",
+        "按授权接口维护角色关系"
+      ],
+      "tech_steps": [
+        "SysUserController",
+        "ISysDeptService",
+        "ISysRoleService",
+        "ISysUserService",
+        "sys_user/sys_user_role"
+      ],
+      "confidence": 96
+    },
+    {
+      "name": "角色维护与权限生效",
+      "description": "维护角色、数据范围和用户授权，并在角色修改后刷新在线用户权限。",
+      "entry_method": "com.ruoyi.web.controller.system.SysRoleController.edit(@Validated @RequestBody SysRole role)",
+      "business_steps": [
+        "检查角色可操作性与数据范围",
+        "校验角色名称和权限字符",
+        "更新角色",
+        "刷新持有角色的在线用户权限",
+        "维护数据范围和用户授权"
+      ],
+      "tech_steps": [
+        "SysRoleController",
+        "ISysRoleService",
+        "TokenService",
+        "SysPermissionService",
+        "sys_role/sys_role_dept/sys_user_role"
+      ],
+      "confidence": 96
+    },
+    {
+      "name": "公告阅读闭环",
+      "description": "首页展示当前用户公告与未读数，按用户记录已读，删除公告时清理阅读记录。",
+      "entry_method": "com.ruoyi.web.controller.system.SysNoticeController.listTop()",
+      "business_steps": [
+        "查询最多五条公告",
+        "计算未读数",
+        "用户标记公告已读",
+        "删除公告时先删除阅读记录"
+      ],
+      "tech_steps": [
+        "SysNoticeController",
+        "ISysNoticeReadService",
+        "ISysNoticeService",
+        "sys_notice/sys_notice_read"
+      ],
+      "confidence": 97
+    },
+    {
+      "name": "定时任务新增与运行",
+      "description": "以 Cron 和调用目标安全校验保护任务新增，支持状态变更和立即执行。",
+      "entry_method": "com.ruoyi.quartz.controller.SysJobController.add(@RequestBody SysJob job)",
+      "business_steps": [
+        "校验 Cron",
+        "拒绝危险调用目标",
+        "执行白名单检查",
+        "保存任务",
+        "按权限启停或立即执行"
+      ],
+      "tech_steps": [
+        "SysJobController",
+        "CronUtils",
+        "ScheduleUtils",
+        "ISysJobService",
+        "Quartz"
+      ],
+      "confidence": 97
+    },
+    {
+      "name": "管理员建表并导入代码生成",
+      "description": "管理员提交 SQL，经安全过滤和类型筛选后建表，并导入生成元数据。",
+      "entry_method": "com.ruoyi.generator.controller.GenController.createTableSave(@RequestParam(\"sql\") String sql, @RequestParam(\"tplWebType\") String tplWebType)",
+      "business_steps": [
+        "校验管理员角色",
+        "过滤 SQL 关键字",
+        "按 MySQL 语法解析",
+        "只执行 CREATE TABLE",
+        "导入成功表的生成元数据"
+      ],
+      "tech_steps": [
+        "GenController",
+        "SqlUtil",
+        "Druid SQL parser",
+        "IGenTableService",
+        "gen_table/gen_table_column"
+      ],
+      "confidence": 95
+    },
+    {
+      "name": "个人密码修改",
+      "description": "当前用户验证旧密码、禁止复用旧密码，加密新密码并刷新密码更新时间和会话缓存。",
+      "entry_method": "com.ruoyi.web.controller.system.SysProfileController.updatePwd(@RequestBody Map<String, String> params)",
+      "business_steps": [
+        "验证旧密码",
+        "检查新旧密码不同",
+        "加密新密码",
+        "更新用户密码",
+        "刷新密码更新时间与登录缓存"
+      ],
+      "tech_steps": [
+        "SysProfileController",
+        "SecurityUtils",
+        "ISysUserService",
+        "TokenService"
+      ],
+      "confidence": 98
+    }
+  ],
+  "chain": {
+    "mainline": [
+      "登录认证",
+      "加载用户权限",
+      "组织与角色授权",
+      "业务资源访问",
+      "审计与运行维护"
+    ],
+    "relationships": [
+      {
+        "from": "用户账号",
+        "to": "登录会话",
+        "relation": "账号认证成功后形成带权限集合的令牌会话",
+        "verification": "V2-静态调用证据"
+      },
+      {
+        "from": "部门",
+        "to": "用户账号",
+        "relation": "用户新增和修改受目标部门数据范围约束",
+        "verification": "V2-控制器分支证据"
+      },
+      {
+        "from": "角色",
+        "to": "用户账号",
+        "relation": "用户与角色通过授权关系绑定，且双方都受数据范围检查",
+        "verification": "V2-控制器调用证据"
+      },
+      {
+        "from": "角色",
+        "to": "菜单",
+        "relation": "角色权限变化会影响在线用户菜单权限并触发会话刷新",
+        "verification": "V2-控制器调用证据"
+      },
+      {
+        "from": "通知公告",
+        "to": "用户账号",
+        "relation": "公告已读状态按用户维度记录",
+        "verification": "V2-控制器参数证据"
+      },
+      {
+        "from": "定时任务",
+        "to": "作业日志",
+        "relation": "调度任务执行结果对应任务日志；本次导出方法未覆盖日志写入实现",
+        "verification": "V0-待服务层证据"
+      },
+      {
+        "from": "代码生成表",
+        "to": "数据库表",
+        "relation": "管理员创建成功的表被导入生成元数据",
+        "verification": "V2-控制器分支证据"
+      }
+    ],
+    "design_narrative": "系统以 Spring Security 方法权限和服务层数据范围检查共同约束管理操作；Controller 负责显式的唯一性、层级、状态与安全输入校验，Service 承担持久化及更深层约束。登录令牌缓存会在用户资料或角色权限变化后同步刷新。公告阅读采用用户—公告关联记录，调度任务在入口集中拦截危险调用目标。",
+    "assumptions": [
+      "证据包只包含按导出顺序截取的 500 个方法，规则限定在这些方法及其可见源码；未把未导出的 Service 内部逻辑写成已证实规则。",
+      "表关系根据扫描表名和 Controller 调用形成静态推演，未用运行时调用链验证。",
+      "PreAuthorize 证明入口权限表达式存在，但其运行时配置与绕过路径仍需部署环境验证。"
+    ],
+    "confidence": 91
+  },
+  "questions": [
+    {
+      "qtype": "evidence_limit",
+      "desc": "本次 evidence.json 仅导出 500/2204 个方法，未覆盖大部分 Service/Mapper 方法；需补充全量证据后核对 Controller 规则在服务层的事务和异常行为。",
+      "suggestion": "以 max_methods=10000 重新导出证据并补充 Service/Mapper 规则。",
+      "status": "open"
+    },
+    {
+      "qtype": "runtime",
+      "desc": "PreAuthorize 与数据范围检查均为静态证据，尚未确认部署环境是否始终启用方法安全。",
+      "suggestion": "用普通用户、管理员和受限数据范围账号执行集成测试。",
+      "status": "open"
+    },
+    {
+      "qtype": "business_confirm",
+      "desc": "角色、用户和任务状态值的具体字典含义未在本次 Controller 证据中完整展开。",
+      "suggestion": "结合常量、字典数据和 Service 实现确认所有状态枚举。",
+      "status": "open"
+    },
+    {
+      "qtype": "security",
+      "desc": "文件下载和定时任务目标校验调用了公共工具方法，本次规则只确认入口调用，未独立审计工具方法的完整安全边界。",
+      "suggestion": "补充 FileUtils、ScheduleUtils、SqlUtil 的源码证据与安全测试。",
+      "status": "open"
+    },
+    {
+      "qtype": "runtime",
+      "desc": "角色变更后刷新在线权限、头像更新后删除旧文件等联动未用运行时证据验证失败补偿。",
+      "suggestion": "测试数据库成功但缓存/文件操作失败时的一致性和恢复策略。",
+      "status": "open"
+    }
+  ]
+}
