@@ -1,10 +1,14 @@
 # C2B CLI（产品②）
 
-完整功能的命令行产品：扫描、AI 标注、模块规格、文档和问答。它面向服务器、批处理、CI 和脚本化场景，分发物为一个 Python wheel。
+> 当前分发版本：v0.2.0。完整变化见[仓库变更日志](../CHANGELOG.md)。
+
+完整功能的命令行产品：扫描、AI 标注、模块规格、文档、问答和确定性图谱回归。它面向本地开发机、服务器、批处理和脚本化场景，分发物为一个 Python wheel。
 
 **它解决什么问题？** 当你不需要浏览器工作台，而需要可重复执行、可纳入自动化、可在内网服务器运行的遗留系统分析能力时，使用 CLI。
 
 CLI 可独立安装和运行，**不依赖 Web 工作台或 Agent Skills**。默认使用本地 SQLite；生产或需要与 Web 共享结果时，再把 `C2B_DB_URL` 指向 PostgreSQL。三种产品的选择方式见根目录 [README](../README.md)。
+
+CLI 当前没有运行证据录入命令。若 CLI 与 Web 共用 PostgreSQL，可在 Web 中为 CLI 生成的规则、流程和推演录入 R1-R3 证据，之后 `c2b docs` 会读取并展示这些记录；只使用 CLI 时也不影响扫描、语义或文档功能，未记录目标显示为 R0。
 
 ## 适用场景
 
@@ -47,6 +51,7 @@ c2b scan <代码目录> --name <项目名>       # 扫描：代码 → 代码图
 c2b scan <代码目录> --name <项目名> --probe-only
       # 仅做规模探测；输出 project_id/scan_id 供后续 `--project-id` 复用，不代表扫描完成
 c2b status <project_id>                   # 流程状态（✅🔄⬜ 六步）
+c2b evaluate <project_id> --manifest quality.json  # 固定样本的 API/表/SQL 图谱回归
 c2b label <project_id> --limit 100        # AI 标注：域/对象/规则/流程/推演
       # 可选：--concurrency 16（并发）、--model deepseek-chat（快）、--no-cache
 c2b export-evidence <project_id> --output evidence.json  # 导出当前 Agent 可审阅的图谱证据
@@ -112,7 +117,7 @@ c2b docs 1 --type overview --output 系统现状说明书.md
 
 | 能力 | 是否需要 LLM | 说明 |
 |---|---|---|
-| Probe、代码扫描、模块/方法/API/SQL/表图谱 | 否 | 可离线完成；默认写入 SQLite 或指定数据库 |
+| Probe、Java 代码扫描、Spring MVC API、MyBatis XML/`.sql` 表与读写图谱 | 否 | 可离线完成；默认写入 SQLite 或指定数据库 |
 | 业务域、对象、规则、流程、主线 | 可选 | `label` 调用云端 Provider；或由当前 Agent 生成结构化 JSON 后 `import-semantic` |
 | 模块需求规格、AI 问答 | 是 | 使用相同 LLM 配置，结果可缓存 |
 | Markdown / Word / Excel / ZIP 导出 | 否 | 依赖已有扫描或业务知识数据 |
@@ -125,6 +130,7 @@ c2b docs 1 --type overview --output 系统现状说明书.md
 - **成本**：DeepSeek 下全量标注 400 方法约 ¥1-2
 - **与网页互通（可选）**：`C2B_DB_URL` 指向同一 PostgreSQL 数据库时，CLI 分析结果可在网页工作台中直接查看
 - **探测与正式扫描**：若先执行 `c2b scan ... --probe-only`，确认后用 `c2b scan <代码目录> --name <项目名> --project-id <id>` 继续正式扫描，避免重复创建项目
+- **质量基线**：`c2b evaluate` 以人工维护的已知代码事实检查最新扫描，适合接入外部 CI；它不等于 LLM 语义准确率。固定 RuoYi-Vue 样本的清单与人工抽样方法见 [`docs/quality-baseline.md`](../docs/quality-baseline.md)
 - 更多使用细节见根目录 `docs/architecture.md`
 
 ## 目录

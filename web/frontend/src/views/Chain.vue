@@ -25,11 +25,18 @@
         <template #header>产品设计逻辑（当初为什么这么设计）</template>
         <p class="narrative">{{ chain.design_narrative }}</p>
         <el-tag size="small" type="info">可信度 {{ chain.confidence }}%</el-tag>
+        <el-tag size="small" class="ml8" :type="runtimeType(chain.runtime_level)">
+          运行验证 {{ chain.runtime_level || 'R0' }}
+        </el-tag>
         <el-tag size="small" class="ml8" type="warning">模型 {{ chain.model }}</el-tag>
         <el-tooltip content="绕过缓存重新调用 AI 推演（30-90 秒）" placement="top">
           <el-button size="small" class="ml8" :loading="rerunning"
                      @click="rerun">强制重新推演</el-button>
         </el-tooltip>
+        <RuntimeEvidencePanel :pid="pid" target-type="chain" :target-id="chain.id"
+                              :initial-level="chain.runtime_level"
+                              :initial-items="chain.runtime_evidence"
+                              @changed="level => chain.runtime_level = level" />
       </el-card>
 
       <el-row :gutter="16" class="mt16">
@@ -40,7 +47,7 @@
               <el-table-column prop="from" label="来源对象" width="130" />
               <el-table-column prop="relation" label="驱动关系" width="100" />
               <el-table-column prop="to" label="目标对象" width="130" />
-              <el-table-column label="证据核实" width="110">
+              <el-table-column label="静态证据" width="110">
                 <template #default="{ row }">
                   <el-tag size="small" :type="verifyType(row.verification)">
                     {{ row.verification }} {{ row.verification_label }}
@@ -51,7 +58,7 @@
                                show-overflow-tooltip />
             </el-table>
             <div class="verify-tip">
-              核实等级：V4 多源证据 / V3 表关联 / V2 部分证据 / V1 单一弱证据 ——
+              静态证据等级：V4 多源证据 / V3 表关联 / V2 部分证据 / V1 单一弱证据 ——
               无证据的关系已移入「推断假设」，不参与主线结论（衡木理念：证据决定可信）
             </div>
           </el-card>
@@ -78,6 +85,7 @@ import { GraphChart } from 'echarts/charts'
 import { LegendComponent, TooltipComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import api, { LONG_REQUEST_TIMEOUT } from '../api'
+import RuntimeEvidencePanel from '../components/RuntimeEvidencePanel.vue'
 
 echarts.use([GraphChart, LegendComponent, TooltipComponent, CanvasRenderer])
 
@@ -169,6 +177,7 @@ const loading = ref(false)
 const rerunning = ref(false)
 const verifyType = v => ({ V4: 'success', V3: 'success', V2: 'warning',
                            V1: 'warning', V0: 'danger' }[v] || 'info')
+const runtimeType = v => ({ R3: 'success', R2: 'warning', R1: 'info', R0: 'info' }[v] || 'info')
 const handleResize = () => chart?.resize()
 
 async function rerun() {

@@ -143,7 +143,7 @@ class Scanner:
                             break
                 else:
                     total, parse_errors, max_files_reached = self._parse_shard_files(
-                        self._all_java_paths(),
+                        self._all_source_paths(),
                         tmp,
                         seen,
                         total,
@@ -352,9 +352,10 @@ class Scanner:
         return probe_mod.build_shard_plan(
             report["modules_detail"], report["total_lines"], report["tier"])
 
-    def _all_java_paths(self) -> list[Path]:
+    def _all_source_paths(self) -> list[Path]:
         return [
-            f for f in sorted(self.root.rglob("*.java"))
+            f for f in sorted(self.root.rglob("*"))
+            if f.is_file() and f.suffix.lower() in {".java", ".xml", ".sql"}
             if not any(p.lower() in probe_mod.EXCLUDE_DIRS
                        for p in f.relative_to(self.root).parts[:-1])
         ]
@@ -363,7 +364,7 @@ class Scanner:
         paths: list[Path] = []
         for file_name in files:
             rel = Path(file_name)
-            if rel.suffix.lower() != ".java":
+            if rel.suffix.lower() not in {".java", ".xml", ".sql"}:
                 continue
             if any(part.lower() in probe_mod.EXCLUDE_DIRS for part in rel.parts[:-1]):
                 continue

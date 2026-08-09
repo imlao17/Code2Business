@@ -13,6 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .. import models
+from ..runtime_evidence import delete_for_targets
 from .run import _map_rule_type
 
 CONTRACT_VERSION = "1.0"
@@ -289,6 +290,7 @@ def import_semantic(s: Session, project_id: int, payload: Any) -> dict[str, int]
     try:
         generated_rule_ids = list(s.execute(select(models.BusinessRule.id).where(models.BusinessRule.scan_id == scan.id, models.BusinessRule.state.in_([models.RuleState.AI_LABELED, models.RuleState.CONFLICT]))).scalars())
         if generated_rule_ids:
+            delete_for_targets(s, scan.id, "rule", generated_rule_ids)
             s.query(models.Question).filter(models.Question.rule_id.in_(generated_rule_ids)).delete(synchronize_session=False)
             s.query(models.BusinessRule).filter(
                 models.BusinessRule.id.in_(generated_rule_ids)
@@ -298,10 +300,20 @@ def import_semantic(s: Session, project_id: int, payload: Any) -> dict[str, int]
             models.BusinessObject.scan_id == scan.id,
             models.BusinessObject.confirmed.is_not(True),
         ).delete(synchronize_session="fetch")
+        generated_flow_ids = list(s.execute(select(models.BusinessFlow.id).where(
+            models.BusinessFlow.scan_id == scan.id,
+            models.BusinessFlow.confirmed.is_not(True),
+        )).scalars())
+        delete_for_targets(s, scan.id, "flow", generated_flow_ids)
         s.query(models.BusinessFlow).filter(
             models.BusinessFlow.scan_id == scan.id,
             models.BusinessFlow.confirmed.is_not(True),
         ).delete(synchronize_session="fetch")
+        generated_chain_ids = list(s.execute(select(models.BusinessChain.id).where(
+            models.BusinessChain.scan_id == scan.id,
+            models.BusinessChain.model == AGENT_MODEL,
+        )).scalars())
+        delete_for_targets(s, scan.id, "chain", generated_chain_ids)
         s.query(models.BusinessChain).filter(models.BusinessChain.scan_id == scan.id, models.BusinessChain.model == AGENT_MODEL).delete(synchronize_session=False)
 
         existing = {domain.name: domain for domain in s.execute(select(models.BusinessDomain).where(models.BusinessDomain.scan_id == scan.id)).scalars()}

@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Code2Business：当前技术架构与实现机制</title>
+  <style>
+    :root{--ink:#172033;--sub:#526275;--blue:#1967ad;--line:#d9e2ec;--wash:#f5f9fd;--purple:#6d4c8f;--green:#287b55;--amber:#9a6616;--red:#a44444}*{box-sizing:border-box}body{margin:0;background:#edf2f7;color:var(--ink);font:15px/1.72 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}.doc{width:210mm;min-height:297mm;margin:18px auto;background:#fff;box-shadow:0 5px 28px #50607033}.cover{min-height:297mm;padding:47mm 24mm 27mm;background:linear-gradient(145deg,#eef7ff 0%,#fff 62%,#e8f3fc 100%);position:relative}.eyebrow{color:var(--blue);font-size:11px;letter-spacing:.18em;font-weight:800}.cover h1{font-size:35px;line-height:1.22;margin:20px 0 15px;letter-spacing:-.04em}.cover .subtitle{font-size:17px;color:#315772;max-width:510px}.cover .claim{margin-top:28px;padding:15px 18px;border-left:4px solid var(--blue);background:#ffffffad;font-size:16px}.cover .meta{position:absolute;bottom:28mm;border-top:1px solid #bfd4e5;padding-top:12px;width:calc(100% - 48mm);font-size:12px;color:var(--sub)}.toc,.chapter{padding:19mm 20mm 16mm}.toc{min-height:297mm;page-break-before:always}.chapter{page-break-before:always}.toc h2,.chapter h2{font-size:25px;line-height:1.3;margin:0 0 16px}.toc .intro{color:var(--sub);margin-bottom:25px}.toc a{display:flex;align-items:center;color:inherit;text-decoration:none;padding:9px 0;border-bottom:1px solid var(--line)}.toc b{min-width:42px;color:var(--blue)}.toc small{margin-left:auto;color:#8091a5}.rule{height:3px;background:linear-gradient(90deg,var(--blue),#9cc3e5,transparent);margin:12px 0 24px}.kicker{font-size:11px;letter-spacing:.14em;color:var(--blue);font-weight:800;margin-bottom:7px}.lead{font-size:17px;color:#34495d}.note,.callout{border-radius:5px;padding:12px 14px;margin:14px 0}.note{background:var(--wash);border:1px solid #dceaf5}.callout{border-left:4px solid var(--blue);background:#f1f7fc}.warn{border-left-color:var(--amber);background:#fff8e8}.danger{border-left-color:var(--red);background:#fff2f2}.ok{border-left-color:var(--green);background:#f1faf5}h3{color:#184f82;font-size:19px;margin:28px 0 10px}h4{font-size:15px;margin:16px 0 6px;color:#233f5a}p{margin:8px 0}ul,ol{padding-left:22px;margin:8px 0}li{margin:4px 0}table{border-collapse:collapse;width:100%;font-size:13px;margin:12px 0 18px}th,td{padding:8px 9px;border:1px solid #cfdae5;vertical-align:top;text-align:left}th{background:#eaf3fb;color:#1e547f;font-weight:750}tr:nth-child(even) td{background:#fbfdff}.code{font:12px/1.65 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;white-space:pre-wrap;background:#152436;color:#e5f1ff;border-radius:6px;padding:14px 16px;overflow:auto}.flow{display:flex;flex-wrap:wrap;gap:7px;align-items:stretch;margin:16px 0}.flow .box{flex:1 1 118px;border:1px solid #b7cee1;border-radius:6px;padding:11px 10px;background:#f8fbfe;font-weight:700;text-align:center}.flow .box small{display:block;color:var(--sub);font-weight:400;line-height:1.45;margin-top:4px}.flow .arrow{align-self:center;color:var(--blue);font-weight:800;font-size:20px}.two,.three{display:grid;gap:12px;margin:12px 0}.two{grid-template-columns:1fr 1fr}.three{grid-template-columns:repeat(3,1fr)}.card{border:1px solid var(--line);border-radius:6px;padding:13px;background:#fff}.card h4{margin-top:0}.card .tag{display:inline-block;background:#e8f2fb;color:#1a5f9d;border-radius:12px;padding:1px 8px;font-size:11px;font-weight:700;margin-bottom:6px}.folder{font:12px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace;background:#f5f7f9;border:1px solid #dde3e8;border-radius:5px;padding:13px 15px;white-space:pre-wrap}.foot{margin-top:28px;padding-top:10px;border-top:1px solid var(--line);font-size:11px;color:#8190a0;text-align:center}.muted{color:var(--sub)}.link{color:var(--blue);font-weight:700}.state{font-size:11px;padding:2px 7px;border-radius:10px;white-space:nowrap}.state.done{background:#def3e8;color:#226c4a}.state.now{background:#e5f1fb;color:#205a8d}.state.limit{background:#fff0d6;color:#8b5b0d}@media(max-width:760px){.doc{width:100%;margin:0}.cover,.toc,.chapter{padding-left:18px;padding-right:18px}.cover{min-height:100vh}.two,.three{grid-template-columns:1fr}.cover h1{font-size:29px}}@page{size:A4;margin:12mm 0 10mm}@media print{body{background:#fff}.doc{width:210mm;margin:0;box-shadow:none}.cover{page-break-after:always}.toc{page-break-after:always}.chapter{padding:10mm 20mm}.card,.note,.callout,tr{break-inside:avoid}h3,h4{break-after:avoid}}
+  </style>
+</head>
+<body>
+<main class="doc">
+  <section class="cover">
+    <div class="eyebrow">TECHNICAL ARCHITECTURE NOTE · CURRENT IMPLEMENTATION</div>
+    <h1>Code2Business<br>当前技术架构与实现机制</h1>
+    <p class="subtitle">解释这个项目如何把遗留代码转成可追溯、可确认、可导出的业务知识：它解决的是什么问题、每一步由什么组件完成，以及三个产品如何围绕同一内核运行。</p>
+    <div class="claim"><b>核心判断：</b>项目不是让大模型“读完整个仓库后写一篇总结”。它先用确定性程序把代码事实抽出来，再让模型或当前 Agent 只对这些事实做业务语义归纳；最后由人工确认决定哪些内容能成为正式交付物。</div>
+    <div class="meta">文档性质：当前代码实现说明，而非客户方案或产品路线图<br>覆盖范围：<code>core/</code>、<code>web/</code>、<code>cli/</code>、<code>skill/</code> 的实际职责与数据路径<br>版本基线：2026-08-09；RuoYi-Vue 固定样本的 24 项确定性图谱断言已通过</div>
+  </section>
+
+  <section class="toc">
+    <div class="kicker">READING GUIDE</div><h2>阅读路线</h2><div class="rule"></div>
+    <p class="intro">如果只想快速理解项目，请先看第 1、2、4 节；如果要参与开发、部署或二次集成，继续看第 5 至 8 节。</p>
+    <a href="#problem"><b>01</b> 项目究竟在解决什么问题 <small>问题与原则</small></a>
+    <a href="#architecture"><b>02</b> 总体架构：事实图谱与业务知识图谱 <small>核心闭环</small></a>
+    <a href="#products"><b>03</b> 三个产品：Web、CLI、Agent Skills <small>独立部署</small></a>
+    <a href="#scan"><b>04</b> 确定性扫描如何建立证据 <small>代码 → 图谱</small></a>
+    <a href="#semantic"><b>05</b> 语义层如何使用模型与当前 Agent <small>两条路径</small></a>
+    <a href="#data"><b>06</b> 数据、确认与文档如何形成可信边界 <small>落库与审计</small></a>
+    <a href="#runtime"><b>07</b> Web 与运行时如何实现 <small>API、任务、安全</small></a>
+    <a href="#limits"><b>08</b> 当前真实边界与后续演进点 <small>已实现 / 未实现</small></a>
+    <div class="note"><b>架构图：</b>本文配套一份可编辑的 draw.io 文件：<a class="link" href="images/src/c2b-current-architecture.drawio">c2b-current-architecture.drawio</a>。可在 draw.io / diagrams.net 中通过“文件 → 打开”直接编辑。</div>
+  </section>
+
+  <section class="chapter" id="problem">
+    <div class="kicker">01 · THE PROBLEM</div><h2>项目要解决的不是“代码解释”，而是业务知识失联</h2><div class="rule"></div>
+    <p class="lead">遗留系统中真正稀缺的往往不是代码文件，而是“为什么这样做”的业务知识：模块边界、业务规则、数据影响、流程例外与责任口径。代码存在，但知识无法被业务人员直接验证，也无法稳定复用到重构、迁移或交付中。</p>
+    <div class="three"><div class="card"><span class="tag">输入问题</span><h4>代码很大，人工无法全读</h4><p>类、方法、SQL、接口和调用关系分散在仓库中。仅靠关键词或通读，容易遗漏入口、跨模块调用与数据读写。</p></div><div class="card"><span class="tag">可信问题</span><h4>纯模型总结不可审计</h4><p>模型可以写出流畅说明，但如果没有文件、行号、方法和表等证据，团队无法判断结论是否真实，也无法定位修正。</p></div><div class="card"><span class="tag">交付问题</span><h4>技术结论无法直接变成业务资产</h4><p>项目需要业务域、规则、流程、数据和验收材料；这些成果必须标示来源、可信度和人工确认状态。</p></div></div>
+    <h3>设计原则：先事实，后解释；先约束，后生成</h3>
+    <table><thead><tr><th>原则</th><th>当前实现方式</th><th>避免的问题</th></tr></thead><tbody>
+      <tr><td>确定性优先</td><td>扫描器先解析 Java 代码，建立模块、类、方法、入口、调用边、SQL 与表等结构化记录。</td><td>把“模型看到的上下文”变成可检查的代码事实，而非整库自由阅读。</td></tr>
+      <tr><td>语义受约束</td><td>云端模型输出必须是 JSON，并经本地 schema 校验；Agent Native 必须按固定 contract 导入。</td><td>自由文本不可消费、字段漂移和模型编造结构。</td></tr>
+      <tr><td>结论带证据</td><td>规则关联文件、行号、方法和代码片段；Agent Native 在导入时逐条验证证据属于当前完成扫描。</td><td>无法追溯、跨项目引用或伪造证据。</td></tr>
+      <tr><td>人工是正式边界</td><td>确认、修改、废弃动作写入审计记录；正式文档只选取已确认或已修改的知识。</td><td>把未核实的 AI 推断误当作业务事实。</td></tr>
+    </tbody></table>
+  </section>
+
+  <section class="chapter" id="architecture">
+    <div class="kicker">02 · CORE ARCHITECTURE</div><h2>一条闭环，两类图谱，三个独立入口</h2><div class="rule"></div>
+    <p class="lead">无论使用 Web、CLI 还是 Agent Skills，最终都进入同一个 <code>core/</code> 内核。内核将代码事实与业务语义分开保存，再通过确认审计把“推断”与“已知”分开。</p>
+    <div class="flow"><div class="box">代码输入<small>本地目录、ZIP、Git</small></div><div class="arrow">→</div><div class="box">确定性扫描<small>解析、调用、SQL、表、入口</small></div><div class="arrow">→</div><div class="box">代码事实图谱<small>可定位到文件与行号</small></div><div class="arrow">→</div><div class="box">业务语义图谱<small>域、对象、规则、流程</small></div><div class="arrow">→</div><div class="box">确认与导出<small>审计、正式文档、规格包</small></div></div>
+    <h3>两类图谱分别解决什么问题</h3>
+    <div class="two"><div class="card"><h4>代码事实图谱：回答“代码里有什么”</h4><p>其来源是解析器而不是模型。主要实体包括 <code>modules</code>、<code>code_objects</code>、<code>call_edges</code>、<code>api_endpoints</code>、<code>data_tables</code> 与 <code>sql_operations</code>。</p><p>它的价值是可复现：同一版本代码重新扫描，会得到相同类型的结构事实；解析失败或动态调用不会被伪装成确定结论。</p></div><div class="card"><h4>业务语义图谱：回答“这些代码在做什么业务”</h4><p>在事实图谱之上保存 <code>business_domains</code>、<code>business_objects</code>、<code>business_rules</code>、<code>business_flows</code>、主线与待确认项。</p><p>它的价值是可理解：技术调用被翻译为业务对象、动作与规则；但每个结论都要保留其证据、可信度与确认状态。</p></div></div>
+    <h3>共享内核与产品外壳的关系</h3>
+    <div class="code">Web 工作台  ─┐
+CLI          ─┼─&gt;  core/（扫描 / 图谱 / 语义 / 确认 / 文档） ─&gt; SQLite 或 PostgreSQL
+Agent Skills ─┘
+
+core/ 不是第四个产品，而是三种分发形态共同安装或调用的运行时。
+产品可以单独运行；只有希望彼此看到同一项目结果时，才显式连接到同一个 PostgreSQL。</div>
+    <div class="note"><b>为什么不直接使用图数据库？</b>当前 MVP 使用 SQLAlchemy 管理 SQLite / PostgreSQL，调用关系与 SQL 读写关系以边表保存。这样减少部署复杂度，同时满足按项目、按扫描版本查询局部关系图的需要。</div>
+  </section>
+
+  <section class="chapter" id="products">
+    <div class="kicker">03 · THREE INDEPENDENT PRODUCTS</div><h2>三个产品共享能力，但服务不同的工作场景</h2><div class="rule"></div>
+    <p class="lead">“三产品”不是同一个应用的三个页面，而是三个可独立安装、独立部署、独立使用的入口。它们选择不同交互方式，但调用的是同一套事实、语义与文档能力。</p>
+    <table><thead><tr><th>产品</th><th>实际组成</th><th>使用者与入口</th><th>如何独立运行</th><th>与其他产品的关系</th></tr></thead><tbody>
+      <tr><td><b>Web 工作台</b></td><td>Vue 3 前端、Nginx、FastAPI API、PostgreSQL Compose 部署。</td><td>业务、产品、实施、交付人员通过浏览器导入代码、查看结果、确认规则与下载文档。</td><td>Docker Compose 可启动前端、API 与内置 PostgreSQL；不需要安装 CLI 或 Skills。</td><td>默认使用自己的数据卷。需要和 CLI/Skills 共用结果时，改为连接同一个受保护 PostgreSQL。</td></tr>
+      <tr><td><b>CLI</b></td><td>Python wheel，命令入口为 <code>c2b</code>。</td><td>开发、架构、运维、CI 和脚本用户；适合批量、定时或无人值守执行。</td><td>Python 3.11+ 即可；默认 SQLite，生产可通过 <code>C2B_DB_URL</code> 切换 PostgreSQL。</td><td>完整功能入口；可以只用 CLI 完成扫描、语义、确认后的文档导出。</td></tr>
+      <tr><td><b>Agent Skills</b></td><td>面向 Codex、Claude Code 等宿主的技能说明、安装脚本与内置 wheel。</td><td>希望通过自然语言驱动分析，同时保留扫描与证据约束的 Agent 用户。</td><td>安装 Skill 与 wheel 后运行；不需要 Web，也不要求单独安装 CLI。</td><td>默认使用当前 Agent 进行首轮语义还原；通过底层 <code>c2b</code> 执行扫描和入库。</td></tr>
+    </tbody></table>
+    <h3>同一问题在三个产品中的使用方式</h3>
+    <div class="three"><div class="card"><h4>Web：本地评审</h4><p>“上传仓库 → 浏览图谱 → 标注 → 确认/修改规则 → 导出文档”。重点是可视化、单团队评审和人工确认；当前不内置登录、角色权限或客户隔离。</p></div><div class="card"><h4>CLI：工程自动化</h4><p>“<code>scan</code> → <code>label</code> 或 Agent Native 导入 → <code>docs</code> → <code>evaluate</code>”。重点是可复跑、可脚本化与图谱回归接入。</p></div><div class="card"><h4>Skills：对话编排</h4><p>“自然语言请求 → 技能按阶段调用 core → 当前 Agent 解释与归纳 → 校验入库”。重点是不让 Agent 跳过扫描或直接凭空写结论。</p></div></div>
+  </section>
+
+  <section class="chapter" id="scan">
+    <div class="kicker">04 · DETERMINISTIC SCAN</div><h2>第一阶段：把仓库变成可验证的代码事实</h2><div class="rule"></div>
+    <p class="lead">扫描入口是 <code>scanner.service.scan_project()</code>，实际编排由 <code>scanner.graph.Scanner</code> 完成。它不调用 LLM，目标是建立后续所有推理的“证据底座”。</p>
+    <h3>扫描管线的实际顺序</h3>
+    <table><thead><tr><th>阶段</th><th>当前实现</th><th>产出与意义</th></tr></thead><tbody>
+      <tr><td>1. 创建扫描</td><td>创建 <code>Project</code> 与一条 <code>Scan</code> 记录；Web 可复用已创建项目，CLI 可新建项目。</td><td>所有事实与语义都归属到特定项目、特定扫描版本，避免跨项目混写。</td></tr>
+      <tr><td>2. Probe 探测</td><td>统计文件、代码行数、模块明细与规模档位；扫描状态进入 <code>PROBING</code>。</td><td>判断是否需要按模块分片，生成扫描规模和覆盖范围说明。</td></tr>
+      <tr><td>3. 分片计划</td><td>规模较大时按照模块形成分片，并为每片创建 <code>scan_tasks</code> 记录。</td><td>当前代码仍由单进程顺序处理，但已经保留任务状态与未来并行化所需的数据结构。</td></tr>
+      <tr><td>4. Java 解析</td><td>tree-sitter 提取包、类、方法、注解、注释、行号、字符串、调用表达式与入口标记。</td><td>写入模块与代码对象；代码对象保留 <code>file_path</code>、起止行、签名与注解。</td></tr>
+      <tr><td>5. 调用解析</td><td>用内存中的“类 + 方法 + 参数个数”索引解析调用目标。</td><td>写入 <code>call_edges</code>。无法可靠解析的目标标记为 <code>UNKNOWN</code>，而不是猜测静态边。</td></tr>
+      <tr><td>6. SQL / 表提取</td><td>从 Java 字符串、MyBatis XML 与 <code>.sql</code> 中提取语句；SQLGlot 解析读写表和字段，动态 SQL 或解析失败时使用粗粒度表名提取并降低可信度。</td><td>写入 <code>data_tables</code> 与 <code>sql_operations</code>；Java 字符串可关联宿主方法，XML 当前仍是 statement/table 级证据。</td></tr>
+      <tr><td>7. 合并与完成</td><td>所有解析中间结果先写入 JSONL 临时文件，再统一合并落库；成功后扫描状态为 <code>DONE</code>。</td><td>避免边解析边写入造成半成品；异常时标记 <code>FAILED</code> 并记录错误摘要。</td></tr>
+    </tbody></table>
+    <h3>“确定性”不等于“无边界”</h3>
+    <div class="two"><div class="callout ok"><b>项目明确保守的地方：</b>动态调用、反射、模板 SQL 或无法唯一定位的调用不会伪造成准确关系；相应记录会有 <code>UNKNOWN</code> 或较低可信度。</div><div class="callout warn"><b>当前范围：</b>深度解析以 Java 为主。架构文档曾描述过的前端路由、MQ、DDL 等扩展能力并不代表全部已经在当前扫描器中完整实现。</div></div>
+    <div class="code">扫描完成后，数据库中已经有足以回答以下问题的“硬事实”：
+- 这个项目有多少模块、文件、类、方法？
+- 哪些方法被识别为入口，位于哪个文件哪一行？
+- 某方法调用了什么；哪些调用无法可靠解析？
+- 哪段 SQL 在读写哪张表，它位于哪个方法/文件？
+
+但扫描器不会声称“这段代码就是订单审批规则”。这一步交给下一阶段的语义处理。</div>
+  </section>
+
+  <section class="chapter" id="semantic">
+    <div class="kicker">05 · SEMANTIC LAYER</div><h2>第二阶段：把事实翻译成业务语言，但不放弃约束</h2><div class="rule"></div>
+    <p class="lead">语义层的职责是从模块、方法、入口、调用和数据线索中归纳业务域、对象、规则、流程与主线。当前项目提供两条路径：服务端可调用的云端 Provider，以及由当前编码 Agent 完成的 Agent Native 路径。</p>
+    <h3>路径 A：云端 Provider（适合 Web、CLI 自动化）</h3>
+    <div class="flow"><div class="box">事实图谱选材<small>模块、候选方法、表、调用链</small></div><div class="arrow">→</div><div class="box">LLMClient<small>统一协议与缓存</small></div><div class="arrow">→</div><div class="box">结构化 JSON<small>Schema 校验</small></div><div class="arrow">→</div><div class="box">语义表落库<small>一次提交，保留人工决定</small></div></div>
+    <table><thead><tr><th>组件 / 规则</th><th>它具体做什么</th></tr></thead><tbody>
+      <tr><td><code>LLMClient</code></td><td>支持 <code>openai_compatible</code> 与 <code>anthropic</code> 两种协议。前者请求 <code>/chat/completions</code>；后者请求 <code>/v1/messages</code>。不对任意自定义 URL 猜测协议。</td></tr>
+      <tr><td>结构化输出</td><td>提示中附带字段要求，本地再校验 JSON 的类型、必填字段、枚举和不允许的附加字段。兼容端即使返回 Markdown fence，也会先提取 JSON 再校验。</td></tr>
+      <tr><td>安全与运行控制</td><td>外部 URL 通过出站地址校验；默认限制不安全地址。请求使用超时、重试、用量计数和基于输入指纹的本地缓存。</td></tr>
+      <tr><td>语义编排</td><td>先识别业务域，再挑选更可能含业务语义的方法，随后生成规则、对象、流程与主线。重标时保留已经确认、修改或废弃的人为决定。</td></tr>
+    </tbody></table>
+    <h3>路径 B：Agent Native（适合 Skills、交互式 CLI）</h3>
+    <p>当前 Agent 的会话不能被 Web 后台任务可靠继承，因此项目没有把 Agent “伪装成一个 HTTP Provider”。取而代之的是显式的导出—分析—校验—导入桥接：</p>
+    <div class="code">c2b scan /path/to/repo --name 项目A
+c2b export-evidence 1 --output evidence.json
+c2b agent-schema &gt; semantic-result.json
+# 当前 Codex / Claude Code 结合 evidence.json 与源码填写 semantic-result.json
+c2b import-semantic 1 --input semantic-result.json</div>
+    <div class="two"><div class="card"><h4>导出的不只是提示词</h4><p><code>export-evidence</code> 从最近一次完成扫描中导出模块、方法、入口、接口、数据表和每个方法的文件、行号、签名、注释等事实。它明确提示 Agent：规则必须引用这些方法范围内的证据。</p></div><div class="card"><h4>导入不是直接写数据库</h4><p><code>import-semantic</code> 检查 contract 版本、未知字段、业务域引用、字段类型、规则证据文件、起止行与方法归属。任一规则不合法，整个导入失败并回滚。</p></div></div>
+    <table><thead><tr><th>Agent Native 的保护点</th><th>当前行为</th></tr></thead><tbody>
+      <tr><td>只允许完成扫描后的项目导入</td><td>没有 <code>DONE</code> 状态的扫描会被拒绝，避免用不完整图谱制造语义。</td></tr>
+      <tr><td>规则证据必须可定位</td><td>规则的文件与 <code>[起始行, 结束行]</code> 必须落在本次扫描提取出的某个方法内部；如果提供 <code>source_method</code>，它也必须与证据方法一致。</td></tr>
+      <tr><td>一次性事务</td><td>先完整校验 payload，再创建域、对象、规则、流程与问题；任何异常都会回滚，不留下半套业务知识。</td></tr>
+      <tr><td>人工作品不会被覆盖</td><td>已确认、已修改与已废弃的规则被保留；机器生成的未确认内容才会被新结果替换。</td></tr>
+    </tbody></table>
+    <div class="callout"><b>关键区别：</b>Agent Native 解决“用户已经有一个强大的当前 Agent，为什么还要配置另一套模型 Key”的问题；云端 Provider 解决“Web 后台、CI、批处理需要无人值守稳定调用”的问题。两者输出进入同一业务知识模型，但运行边界不同。</div>
+  </section>
+
+  <section class="chapter" id="data">
+    <div class="kicker">06 · DATA, TRUST &amp; DOCUMENTS</div><h2>第三阶段：用数据模型和确认审计决定什么可以被相信</h2><div class="rule"></div>
+    <p class="lead">C2B 不生成一个含义模糊的“总可信分”。数据库把静态证据、R0-R3 运行验证、AI 可信度和人工确认状态分别保存，文档导出时再按状态过滤。</p>
+    <h3>核心数据关系</h3>
+    <div class="code">projects
+  └─ scans（每次扫描的状态、元数据与统计）
+       ├─ modules / code_objects / call_edges
+       ├─ api_endpoints / data_tables / sql_operations
+       ├─ business_domains / business_objects / business_rules / business_flows
+       ├─ runtime_evidence / questions / confirmations / documents
+       └─ scan_tasks / label_jobs（任务过程记录）</div>
+    <h3>从 AI 推断到正式事实的状态机</h3>
+    <div class="flow"><div class="box">AI 识别<small>尚未被人核实</small></div><div class="arrow">→</div><div class="box">已确认<small>业务或技术人员认可</small></div><div class="arrow">→</div><div class="box">正式文档<small>可作为交付依据</small></div><div class="arrow">↘</div><div class="box">已修改 / 已废弃<small>保留审计与原因</small></div></div>
+    <table><thead><tr><th>对象</th><th>确认机制</th><th>为什么重要</th></tr></thead><tbody>
+      <tr><td>业务规则</td><td>状态包含 AI 识别、已确认、已修改、已废弃、冲突；确认 API 保存用户、动作、修改前后内容与扫描版本。</td><td>业务规则最容易被错误理解，且最需要留下“谁在何时按什么口径确认”的痕迹。</td></tr>
+      <tr><td>业务域、对象、流程</td><td>有对应确认标记；正式导出时默认只选取已确认项。</td><td>防止尚在讨论的域划分和流程推断进入最终材料。</td></tr>
+      <tr><td>运行证据</td><td>规则、流程和推演可分别记录 R1 测试、R2 受控/预发布、R3 生产证据；无记录派生为 R0。</td><td>R 等级不会修改 AI 可信度、V 静态证据或人工确认状态，避免不同含义被混算。</td></tr>
+      <tr><td>文档</td><td><code>documents._gather()</code> 默认排除未确认语义；只有显式 <code>--draft</code> 才会包含 AI 未确认内容和主线。</td><td>把“内部探索材料”与“正式交付材料”分开，是项目最重要的信任边界。</td></tr>
+    </tbody></table>
+    <div class="note"><b>数据库选择：</b>开发或单机 CLI 使用 SQLite 即可；Web Compose 和跨产品协同时使用 PostgreSQL。<code>init_db()</code> 通过 SQLAlchemy 建表，并运行项目内的幂等增量迁移；当前没有引入 Alembic。</div>
+  </section>
+
+  <section class="chapter" id="runtime">
+    <div class="kicker">07 · WEB &amp; RUNTIME IMPLEMENTATION</div><h2>Web 是一个可视化入口，不是另一套业务引擎</h2><div class="rule"></div>
+    <p class="lead">Web 工作台的后端直接复用 <code>core/</code> 的扫描、语义、确认和文档模块。前端负责呈现和操作；FastAPI 负责 API、任务调度、文件/Git 导入与安全边界。</p>
+    <h3>Web 请求从上传到结果的路径</h3>
+    <div class="code">浏览器上传 ZIP / 提交 Git URL
+  → POST /api/projects/import
+  → 校验“二选一”输入、大小、压缩包安全或 Git 出站地址
+  → 为项目创建安全的本地存储目录
+  → 后台线程调用 scan_project(...)
+  → Scanner 落库并更新扫描状态
+  → 前端按项目查询概览、模块、规则、流程、数据与文档</div>
+    <h3>当前 Web 的关键实现选择</h3>
+    <table><thead><tr><th>部分</th><th>实际技术与行为</th><th>含义</th></tr></thead><tbody>
+      <tr><td>前端</td><td>Vue 3 + Vite + Element Plus；Compose 中由 Nginx 托管构建产物。</td><td>负责工作台交互与图谱呈现，不承载扫描与模型逻辑。</td></tr>
+      <tr><td>API</td><td>FastAPI，路由位于 <code>core/src/c2b/api/routes.py</code>。</td><td>项目导入、查询、确认、文档、任务状态等能力都通过 REST API 暴露。</td></tr>
+      <tr><td>后台任务</td><td>使用进程内 <code>threading.Thread</code>，并通过 <code>label_jobs</code> 的部分唯一索引确保同一项目只有一个运行中的标注任务。</td><td>适合当前 MVP；不是 Celery / Redis 分布式队列。</td></tr>
+      <tr><td>鉴权</td><td>本地默认零配置；设置 <code>C2B_API_TOKEN</code> 后，API 接受 Bearer 或 <code>X-C2B-Token</code>。</td><td>这是服务入口令牌，不是用户登录/角色权限/客户隔离；远程部署仍应由 HTTPS、身份认证和反向代理保护。</td></tr>
+      <tr><td>部署</td><td>Compose 启动 PostgreSQL、API、Nginx；默认仅将前端绑定在 <code>127.0.0.1:8080</code>。</td><td>默认不直接暴露到公网，远程访问需要部署者显式配置安全边界。</td></tr>
+    </tbody></table>
+    <h3>关键源码位置：从问题到实现的导航</h3>
+    <div class="folder">core/src/c2b/
+├── scanner/service.py        # scan_project：完整扫描的共享入口
+├── scanner/graph.py          # Scanner：探测、分片、解析、图谱合并入库
+├── scanner/parse.py          # tree-sitter Java 解析
+├── scanner/sqlx.py           # SQL 解析
+├── semantics/run.py          # 云端语义标注编排
+├── semantics/agent_native.py # 证据导出与结构化、原子导入
+├── llm.py                    # OpenAI Compatible / Anthropic HTTP 适配、缓存、校验
+├── documents.py              # 按确认状态收集并生成文档
+├── models.py                 # SQLAlchemy 数据模型与状态枚举
+├── db.py                     # SQLite/PG 引擎、会话、幂等轻量迁移
+└── api/routes.py             # Web REST API、导入、后台任务、确认等
+
+web/frontend/                 # Vue 工作台
+web/deploy/                   # Dockerfile、Compose、Nginx、离线分发脚本
+cli/                          # wheel 构建及 CLI 使用说明
+skill/                        # c2b-analyze / scan / semantic / docs 技能组</div>
+  </section>
+
+  <section class="chapter" id="limits">
+    <div class="kicker">08 · CURRENT BOUNDARIES</div><h2>当前已实现什么，哪些仍是演进方向</h2><div class="rule"></div>
+    <p class="lead">理解当前项目时，必须把“设计目标”与“已经落到代码中的能力”分开。下表按当前代码和 README 的实现基线整理。</p>
+    <table><thead><tr><th>能力</th><th>当前状态</th><th>说明</th></tr></thead><tbody>
+      <tr><td>Java 静态扫描、Spring MVC API、MyBatis XML/SQL 图谱</td><td><span class="state done">已实现</span></td><td>通过 tree-sitter、符号索引与 SQL 解析建立事实图谱；RuoYi-Vue 固定提交的 24 个 API/表/SQL 断言已通过；无法唯一解析的调用保守标记。</td></tr>
+      <tr><td>Web、CLI、Skills 三种独立入口</td><td><span class="state done">已实现</span></td><td>三者共享 core，但不需要彼此同时部署。</td></tr>
+      <tr><td>OpenAI Compatible 与 Anthropic Native</td><td><span class="state done">已实现</span></td><td>两条 HTTP 协议由 <code>LLMClient</code> 显式适配，并保持相同 JSON 校验与安全约束。</td></tr>
+      <tr><td>当前 Agent 直接用于首轮语义</td><td><span class="state done">已实现</span></td><td>仅 CLI/Skills 使用 Agent Native 桥接；Web 后台没有当前会话，因此不提供该模式。</td></tr>
+      <tr><td>正式文档的确认边界</td><td><span class="state done">已实现</span></td><td>默认只导出确认/修改后的业务知识；草稿模式才包含未确认内容。</td></tr>
+      <tr><td>R0-R3 运行证据管理</td><td><span class="state done">已实现</span></td><td>Web/API 可对规则、流程和推演手工录入、查看和纠错删除；导出材料展示运行等级与引用。</td></tr>
+      <tr><td>分布式队列、断点续扫和并行分片</td><td><span class="state limit">数据结构已预留</span></td><td>已有 <code>scan_tasks</code> 与任务状态；当前扫描/后台任务仍是进程内线程与 MVP 串行路径，而非 Celery/Redis 集群。</td></tr>
+      <tr><td>多语言同等深度解析、Mapper↔Java 精确绑定、Vue/MQ/自动运行时采集</td><td><span class="state limit">范围受限</span></td><td>当前深度解析以 Java 为主；MyBatis XML 当前只提供 statement/table 级证据；运行证据由人录入，尚未自动接入 OpenTelemetry、APM 或日志平台。</td></tr>
+      <tr><td>Embedding 向量 RAG</td><td><span class="state limit">非当前主路径</span></td><td>当前问答以有上限的图谱关键词检索为主，不以向量检索作为事实依据。</td></tr>
+    </tbody></table>
+    <h3>把项目放到实际工作中，建议这样理解</h3>
+    <ol><li><b>扫描回答“系统客观上有什么”。</b>它能给出模块、入口、方法、调用、SQL、表及定位证据。</li><li><b>语义回答“这些结构可能表达什么业务”。</b>模型和 Agent 帮助把技术结构转译成业务语言，但输出必须受 schema 和证据约束。</li><li><b>确认回答“哪些结论可以当作项目事实”。</b>人工确认让交付物脱离模型的不确定性，成为可追责、可回溯的知识资产。</li><li><b>三个产品回答“团队以什么方式使用这套能力”。</b>浏览器协作选 Web，工程自动化选 CLI，已使用编码 Agent 的团队选 Skills。</li></ol>
+    <div class="callout ok"><b>最终总结：</b>Code2Business 的真正产品能力，不是“AI 解释代码”，而是把遗留代码分析过程拆成可验证、可审计、可协作的知识生产流水线。确定性扫描提供底座，语义能力提高理解速度，人工确认建立最终信任边界，Web / CLI / Skills 则让不同角色以合适的方式进入这条流水线。</div>
+    <div class="foot">Code2Business v0.2.0 · 当前技术架构与实现机制 · 基于仓库实现整理 · 2026-08-09</div>
+  </section>
+</main>
+</body>
+</html>

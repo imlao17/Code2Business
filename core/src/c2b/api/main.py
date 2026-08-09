@@ -6,17 +6,22 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
-from ..db import init_db
+from .. import __version__
+from ..db import init_db, recover_stale_label_jobs
 from .routes import router
 
 
 @asynccontextmanager
 async def _lifespan(_app: FastAPI):
     init_db()
+    # The deployed API runs one process with daemon-thread workers. A process
+    # restart destroys those workers, so clear their visible job locks before
+    # accepting requests; otherwise a project can remain "running" forever.
+    recover_stale_label_jobs(force=True)
     yield
 
 
-app = FastAPI(title="Code2Business API", version="0.1.0", lifespan=_lifespan)
+app = FastAPI(title="Code2Business API", version=__version__, lifespan=_lifespan)
 app.include_router(router)
 
 

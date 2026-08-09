@@ -234,6 +234,37 @@ def status(project_id):
         s.close()
 
 
+@cli.command("evaluate")
+@click.argument("project_id", type=int)
+@click.option("--manifest", "manifest_path", type=click.Path(
+    exists=True, dir_okay=False, readable=True, path_type=Path), required=True,
+              help="已知代码事实的质量基线 JSON 清单")
+@click.option("--output", type=click.Path(dir_okay=False, path_type=Path),
+              default=None, help="可选：写入 JSON 结果文件")
+def evaluate(project_id: int, manifest_path: Path, output: Path | None):
+    """针对已完成扫描执行可复跑的确定性质量基线检查。"""
+    from .evaluation import EvaluationError, evaluate_scan, load_manifest
+
+    init_db()
+    s = SessionLocal()
+    try:
+        manifest = load_manifest(manifest_path)
+        result = evaluate_scan(s, project_id, manifest)
+        rendered = json.dumps(result, ensure_ascii=False, indent=2)
+        if output is not None:
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(rendered + "\n", encoding="utf-8")
+        click.echo(rendered)
+        if result["missing"]:
+            raise click.ClickException(
+                "质量基线未通过：" + ", ".join(result["missing"])
+            )
+    except EvaluationError as exc:
+        raise click.ClickException(str(exc)) from exc
+    finally:
+        s.close()
+
+
 @cli.command()
 @click.argument("project_id", type=int)
 @click.option("--module", "module_id", type=int, default=None,

@@ -28,6 +28,11 @@ SQL_HINT = re.compile(r"\b(select|insert|update|delete|merge)\b", re.IGNORECASE)
 SQL_CLAUSE = re.compile(r"\b(from|into|set|values|join|where)\b", re.IGNORECASE)
 # 模板 SQL 特征：占位符/动态片段（注意：Java 字符串拼接的 + 不算模板特征）
 SQL_TEMPLATE_HINT = re.compile(r"(\$\{|#\{|:param|\?\s|\\\"|concat\(|\+\s*[\"'])", re.IGNORECASE)
+MAPPER_STATEMENT = re.compile(
+    r"<(?P<kind>select|insert|update|delete)\b[^>]*>(?P<body>.*?)</(?P=kind)\s*>",
+    re.IGNORECASE | re.DOTALL,
+)
+XML_TAG = re.compile(r"<[^>]+>")
 
 CLASS_TYPES = {
     "class_declaration": "class",
@@ -72,24 +77,33 @@ def _annotations(modifiers_node) -> list[dict]:
     if modifiers_node is None:
         return out
     for child in modifiers_node.named_children:
+        # tree-sitter distinguishes @RestController from @RequestMapping(...)
+        # as marker_annotation and annotation.  Both carry routing semantics.
+        if child.type not in ("annotation", "marker_annotation"):
+            continue
+        name_node = child.named_children[0] if child.named_children else None
+        if name_node is None:
+            continue
+        t = _text(name_node) or ""
+        name = t.split(".")[-1]
+        value = None
         if child.type == "annotation":
-            name_node = child.named_children[0] if child.named_children else None
-            if name_node is None:
-                continue
-            t = _text(name_node) or ""
-            name = t.split(".")[-1]
-            value = None
-            for c in child.named_children[1:]:
-                if c.type == "annotation_argument_list":
-                    for cc in c.named_children:
-                        if cc.type == "string_literal":
-                            value = _decode_bytes(cc.text).strip("\"'")
-                            break
-                    break
-            item = {"name": name, "value": value}
-            if not any(x["name"] == name for x in out):
-                out.append(item)
+            value = _first_annotation_string(child)
+        item = {"name": name, "value": value}
+        if not any(x["name"] == name for x in out):
+            out.append(item)
     return out
+
+
+def _first_annotation_string(node) -> str | None:
+    """Return the first string argument, including ``value = {…}`` forms."""
+    stack = list(reversed(node.named_children))
+    while stack:
+        child = stack.pop()
+        if child.type == "string_literal":
+            return _decode_bytes(child.text).strip("\"'")
+        stack.extend(reversed(child.named_children))
+    return None
 
 
 def _prev_comment(node):
@@ -104,7 +118,10 @@ def _prev_comment(node):
 
 
 def parse_file(abs_path: Path, rel_path: str, module_name: str) -> dict:
-    """解析单个 Java 文件。"""
+    """Parse one supported source file (Java, MyBatis XML, or SQL)."""
+    if abs_path.suffix.lower() in {".xml", ".sql"}:
+        return _parse_sql_resource(abs_path, rel_path, module_name)
+
     try:
         data = abs_path.read_bytes()
     except OSError as e:
@@ -251,4 +268,51 @@ def parse_file(abs_path: Path, rel_path: str, module_name: str) -> dict:
         "version_file": version_file,
         "classes": classes, "methods": methods, "fields": fields,
         "calls": calls, "strings": strings,
+    }
+
+
+def _parse_sql_resource(abs_path: Path, rel_path: str, module_name: str) -> dict:
+    """Extract statement bodies from mapper XML and standalone SQL files.
+
+    Mapper XML intentionally stays at statement/table level: it yields SQL
+    evidence but does not pretend to resolve a Mapper method to a Java method.
+    That association needs namespace + interface analysis and remains a later
+    precision enhancement.
+    """
+    try:
+        text = _decode_bytes(abs_path.read_bytes())
+    except OSError as exc:
+        return {"file": rel_path, "error": str(exc)}
+
+    strings: list[dict] = []
+    suffix = abs_path.suffix.lower()
+    if suffix == ".xml":
+        for match in MAPPER_STATEMENT.finditer(text):
+            body = match.group("body")
+            # Keep dynamic MyBatis fragments visible to the SQL fallback while
+            # removing XML syntax that would confuse SQLGlot.
+            sql_text = XML_TAG.sub(" ", body)
+            sql_text = sql_text.replace("<![CDATA[", "").replace("]]>", "")
+            sql_text = " ".join(sql_text.split())
+            if not sql_text:
+                continue
+            strings.append({
+                "text": sql_text[:20000],
+                "line": text.count("\n", 0, match.start()) + 1,
+                "ctx": None, "ctx_line": None, "cls": None, "cls_start": None,
+                "template": bool(SQL_TEMPLATE_HINT.search(sql_text)),
+            })
+    elif suffix == ".sql":
+        sql_text = text.strip()
+        if sql_text:
+            strings.append({
+                "text": sql_text[:20000], "line": 1,
+                "ctx": None, "ctx_line": None, "cls": None, "cls_start": None,
+                "template": bool(SQL_TEMPLATE_HINT.search(sql_text)),
+            })
+
+    return {
+        "file": rel_path, "module": module_name, "package": "",
+        "lines": len(text.splitlines()), "version_file": is_version_file(abs_path.stem),
+        "classes": [], "methods": [], "fields": [], "calls": [], "strings": strings,
     }

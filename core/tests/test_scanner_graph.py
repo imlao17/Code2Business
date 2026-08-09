@@ -118,9 +118,79 @@ class Demo {
 
                 task = session.execute(select(models.ScanTask)).scalar_one()
                 self.assertEqual(task.status, models.TaskStatus.DONE)
-                self.assertEqual(scanner.scan.meta["parsed_files"], 1)
+                self.assertEqual(scanner.scan.meta["parsed_files"], 2)
                 self.assertEqual(scanner.scan.stats["classes"], 1)
                 self.assertEqual(scanner.scan.stats["methods"], 1)
+            finally:
+                close_session(session)
+
+    def test_spring_marker_annotations_create_api_endpoint(self) -> None:
+        source = """\
+package demo;
+
+@RestController
+@RequestMapping("/users")
+class UserController {
+    @PostMapping
+    void create() {}
+
+    @GetMapping(value = "/{id}")
+    void get() {}
+}
+"""
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "UserController.java").write_text(source, encoding="utf-8")
+            session = make_session()
+            try:
+                scanner = Scanner(session, root, "demo")
+                scanner.create()
+                scanner.run_parse(report={})
+
+                endpoints = session.execute(
+                    select(models.ApiEndpoint)
+                    .where(models.ApiEndpoint.scan_id == scanner.scan.id)
+                    .order_by(models.ApiEndpoint.path)
+                ).scalars().all()
+                self.assertEqual(
+                    [(item.method, item.path) for item in endpoints],
+                    [("POST", "/users"), ("GET", "/users/{id}")],
+                )
+            finally:
+                close_session(session)
+
+    def test_mybatis_xml_contributes_table_and_sql_operations(self) -> None:
+        mapper = """\
+<mapper namespace="demo.UserMapper">
+  <select id="selectUser">SELECT * FROM sys_user WHERE user_id = #{userId}</select>
+  <update id="disableUser">UPDATE sys_user SET status = '1' WHERE user_id = #{userId}</update>
+</mapper>
+"""
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            mapper_path = root / "mapper" / "UserMapper.xml"
+            mapper_path.parent.mkdir()
+            mapper_path.write_text(mapper, encoding="utf-8")
+            session = make_session()
+            try:
+                scanner = Scanner(session, root, "demo")
+                scanner.create()
+                scanner.run_parse(report={})
+
+                tables = session.execute(
+                    select(models.DataTable.name)
+                    .where(models.DataTable.scan_id == scanner.scan.id)
+                ).scalars().all()
+                operations = session.execute(
+                    select(models.SqlOperation.op)
+                    .where(models.SqlOperation.scan_id == scanner.scan.id)
+                    .order_by(models.SqlOperation.id)
+                ).scalars().all()
+                self.assertEqual(tables, ["sys_user"])
+                self.assertEqual(
+                    operations,
+                    [models.SqlOp.SELECT, models.SqlOp.UPDATE],
+                )
             finally:
                 close_session(session)
 

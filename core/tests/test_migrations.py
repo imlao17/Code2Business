@@ -12,6 +12,28 @@ from c2b.semantics.module_analysis import materialize_analysis
 
 
 class AdditiveMigrationTests(unittest.TestCase):
+    def test_create_all_adds_runtime_evidence_table_to_existing_database(self):
+        with tempfile.TemporaryDirectory() as td:
+            engine = make_engine(f"sqlite:///{Path(td) / 'runtime.db'}")
+            with engine.begin() as connection:
+                connection.exec_driver_sql(
+                    "CREATE TABLE projects (id INTEGER PRIMARY KEY)"
+                )
+
+            Base.metadata.create_all(engine)
+
+            self.assertIn("runtime_evidence", inspect(engine).get_table_names())
+            columns = {
+                column["name"] for column in inspect(engine).get_columns(
+                    "runtime_evidence"
+                )
+            }
+            self.assertTrue({
+                "scan_id", "target_type", "target_id", "level",
+                "environment", "summary",
+            }.issubset(columns))
+            engine.dispose()
+
     def test_confirmation_scan_owner_is_added_and_backfilled(self):
         with tempfile.TemporaryDirectory() as td:
             engine = make_engine(f"sqlite:///{Path(td) / 'legacy.db'}")
@@ -101,6 +123,11 @@ class AdditiveMigrationTests(unittest.TestCase):
                 "label_jobs"
             )}
             self.assertIn("uq_label_jobs_project_running", indexes)
+            columns = {column["name"] for column in inspect(engine).get_columns(
+                "label_jobs"
+            )}
+            self.assertIn("started_at", columns)
+            self.assertIn("heartbeat_at", columns)
             with engine.connect() as connection:
                 running = connection.exec_driver_sql(
                     "SELECT COUNT(*) FROM label_jobs "

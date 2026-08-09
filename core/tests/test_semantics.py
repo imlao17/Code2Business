@@ -111,6 +111,19 @@ class RelabelSafetyTests(unittest.TestCase):
         self.tmp.cleanup()
 
     def test_relabel_preserves_human_decisions_and_replaces_generated_rule(self):
+        self.s.add_all([
+            models.RuntimeEvidence(
+                scan_id=self.scan.id, target_type="rule",
+                target_id=self.reviewed.id, level="R2", evidence_type="trace",
+                environment="staging", summary="reviewed evidence",
+            ),
+            models.RuntimeEvidence(
+                scan_id=self.scan.id, target_type="rule",
+                target_id=self.generated.id, level="R1", evidence_type="test",
+                environment="test", summary="stale generated evidence",
+            ),
+        ])
+        self.s.commit()
         result = run_label(
             self.s,
             self.project_id,
@@ -128,6 +141,10 @@ class RelabelSafetyTests(unittest.TestCase):
         self.assertNotIn("旧 AI 规则", {rule.name for rule in rules})
         self.assertEqual(result["preserved_human_rules"], 1)
         self.assertEqual(result["rules"], 1)
+        evidence_targets = set(self.s.execute(
+            select(models.RuntimeEvidence.target_id)
+        ).scalars().all())
+        self.assertEqual(evidence_targets, {self.reviewed.id})
 
     def test_total_llm_failure_leaves_old_generated_data_untouched(self):
         with self.assertRaises(RuntimeError):
@@ -178,6 +195,12 @@ class RelabelSafetyTests(unittest.TestCase):
         self.assertEqual([method.id for method in picked], [entry.id])
 
     def test_agent_native_import_is_grounded_and_preserves_human_rule(self):
+        self.s.add(models.RuntimeEvidence(
+            scan_id=self.scan.id, target_type="rule",
+            target_id=self.generated.id, level="R1", evidence_type="test",
+            environment="test", summary="old generated evidence",
+        ))
+        self.s.commit()
         evidence = export_evidence(self.s, self.project_id)
         self.assertEqual(evidence["scan"]["id"], self.scan.id)
         self.assertIn("OrderService.approveOrder()", {m["fq_name"] for m in evidence["methods"]})
@@ -198,6 +221,7 @@ class RelabelSafetyTests(unittest.TestCase):
         imported = next(rule for rule in rules if rule.name == "审批校验")
         self.assertEqual(imported.model, "agent-native")
         self.assertEqual(imported.evidence_lines, [2, 2])
+        self.assertEqual(self.s.query(models.RuntimeEvidence).count(), 0)
 
     def test_agent_native_rejects_unscanned_evidence_without_mutation(self):
         invalid = {

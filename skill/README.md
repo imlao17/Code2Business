@@ -1,10 +1,14 @@
 # C2B Agent Skills（产品③）
 
+> 当前分发版本：v0.2.0。完整变化见[仓库变更日志](../CHANGELOG.md)。
+
 这是面向 Claude Code、Codex、opencode 等兼容 Agent 宿主的独立技能产品。它让使用者通过自然语言编排“扫描 → 语义标注 → 模块规格 → 文档交付”，并要求 Agent 在每个阶段报告证据、覆盖范围和待确认项。
 
 **它解决什么问题？** 当团队已经在用 AI 编程 Agent，希望不记命令、又不希望 Agent 跳过扫描或凭空总结代码时，使用 Agent Skills。
 
 它可以独立安装，**不需要部署 Web 工作台，也不要求额外安装 CLI**；安装脚本会安装所需的 c2b wheel 运行时。Web 与 CLI 只是可选的同数据源入口。三种产品的选择方式见根目录 [README](../README.md)。
+
+Skills 当前负责静态扫描、语义还原和文档交付，不会把“Agent 读过代码”伪装成运行证据。若与 Web 共用 PostgreSQL，可在 Web 中为生成的规则、流程和推演分别录入 R1 测试、R2 受控/预发布、R3 生产证据；未录入时为 R0。
 
 ## 技能组
 
@@ -67,6 +71,9 @@ Codex、Claude Code 或其他兼容 Agent 结合源码生成结构化结果，�
 这不是让 Agent 绕过证据直接写数据库：规则若不引用本次扫描中的方法和行号，整个导入会被拒绝。
 已人工确认或修改的内容不会被覆盖。模块规格和图谱问答是单独的云端 LLM 功能；如需它们，再配置
 OpenAI Compatible 或 Anthropic Native Provider。
+
+Agent Native 的结构化校验保证“结论能回到代码证据”，不自动证明业务描述正确。对外交付前应按
+[质量基线](../docs/quality-baseline.md)抽取至少 50 条规则，由独立评审人登记正确性和修订原因。
 
 一个完整请求示例：
 

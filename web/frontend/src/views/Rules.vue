@@ -49,6 +49,13 @@
                          :color="confColor(row.confidence)" />
           </template>
         </el-table-column>
+        <el-table-column label="运行验证" width="90">
+          <template #default="{ row }">
+            <el-tag size="small" :type="runtimeType(row.runtime_level)">
+              {{ row.runtime_level || 'R0' }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column label="状态" width="100">
           <template #default="{ row }">
             <el-tag size="small" :type="stateType(row.state)">{{ stateLabel(row.state) }}</el-tag>
@@ -82,6 +89,11 @@
 
         <div class="snippet-title">代码证据片段</div>
         <pre class="pre code">{{ detail.evidence_snippet }}</pre>
+
+        <RuntimeEvidencePanel :pid="pid" target-type="rule" :target-id="detail.id"
+                              :initial-level="detail.runtime_level"
+                              :initial-items="detail.runtime_evidence"
+                              @changed="runtimeChanged" />
 
         <div class="actions">
           <el-button type="success" @click="confirm('confirm')">确认</el-button>
@@ -148,6 +160,7 @@ import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import api from '../api'
 import GuideBanner from '../components/GuideBanner.vue'
+import RuntimeEvidencePanel from '../components/RuntimeEvidencePanel.vue'
 
 const props = defineProps({ pid: { type: [Number, String], default: null } })
 const rules = ref([])
@@ -204,6 +217,7 @@ const typeLabel = v => (ruleTypes.find(t => t.value === v) || {}).label || v
 const stateLabel = v => (states.find(t => t.value === v) || {}).label || v
 const stateType = v => ({ ai_labeled: 'info', confirmed: 'success', modified: 'warning', discarded: 'danger' }[v] || 'info')
 const confColor = c => c >= 75 ? '#67c23a' : c >= 50 ? '#e6a23c' : '#f56c6c'
+const runtimeType = v => ({ R3: 'success', R2: 'warning', R1: 'info', R0: 'info' }[v] || 'info')
 const rowClass = ({ row }) => row.state === 'discarded' ? 'row-discarded' : ''
 const confirmedCount = computed(() =>
   rules.value.filter(r => ['confirmed', 'modified'].includes(r.state)).length)
@@ -230,6 +244,12 @@ async function openDetail(row) {
   detail.value = (await api.get(`/projects/${props.pid}/rules/${row.id}`)).data
   note.value = ''
   drawer.value = true
+}
+
+function runtimeChanged(nextLevel) {
+  detail.value.runtime_level = nextLevel
+  const row = rules.value.find(item => item.id === detail.value.id)
+  if (row) row.runtime_level = nextLevel
 }
 
 async function confirm(action) {

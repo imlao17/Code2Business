@@ -1,5 +1,7 @@
 """FastAPI 查询 API（对齐 mvp-tech-solution.md 第 6 章核心端点）。"""
 import os
+import threading
+from datetime import UTC, datetime
 from typing import Literal
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
@@ -9,9 +11,63 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .. import models
-from ..db import get_session
+from ..db import SessionLocal, get_session, job_lease_seconds, recover_stale_label_jobs
 
 router = APIRouter(prefix="/api")
+
+
+def _touch_project_job(job_id: int, *, stage: str | None = None,
+                       progress: int | None = None, total: int | None = None) -> None:
+    """Refresh a Web worker lease using a short, isolated database session."""
+    s = SessionLocal()
+    try:
+        job = s.get(models.LabelJob, job_id)
+        if job is None or job.status != "running":
+            return
+        job.heartbeat_at = models.utcnow()
+        if stage is not None:
+            job.stage = stage
+        if progress is not None:
+            job.progress = progress
+        if total is not None:
+            job.total = total
+        s.commit()
+    finally:
+        s.close()
+
+
+class _JobLease:
+    """Periodic heartbeat for one daemon-thread worker.
+
+    Progress callbacks alone are not sufficient: Git clone and a single long
+    LLM request may have no progress event for minutes.  This compact helper
+    keeps the job recoverable without adding a queue dependency.
+    """
+    def __init__(self, job_id: int):
+        self.job_id = job_id
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+        self._interval = max(5, min(30, job_lease_seconds() // 3))
+
+    def start(self) -> None:
+        _touch_project_job(self.job_id)
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    def _run(self) -> None:
+        while not self._stop.wait(self._interval):
+            try:
+                _touch_project_job(self.job_id)
+            except Exception:
+                # A later successful progress update can renew the lease;
+                # never terminate useful scan work just because telemetry
+                # briefly cannot write.
+                pass
+
+    def stop(self) -> None:
+        self._stop.set()
+        if self._thread is not None:
+            self._thread.join(timeout=1)
 
 
 class ConfirmIn(BaseModel):
@@ -19,6 +75,20 @@ class ConfirmIn(BaseModel):
     user: str | None = Field(default=None, max_length=100)
     note: str | None = Field(default=None, max_length=4000)
     fields: dict | None = None   # modify 时提供
+
+
+class RuntimeEvidenceIn(BaseModel):
+    target_type: Literal["rule", "flow", "chain"]
+    target_id: int = Field(gt=0)
+    level: Literal["R1", "R2", "R3"]
+    evidence_type: Literal[
+        "test", "trace", "log", "reconciliation", "manual_observation"
+    ]
+    environment: Literal["test", "controlled", "staging", "production"]
+    summary: str = Field(min_length=1, max_length=4000)
+    reference: str | None = Field(default=None, max_length=2048)
+    observed_at: datetime | None = None
+    created_by: str | None = Field(default=None, max_length=100)
 
 
 def _latest_scan(
@@ -43,6 +113,37 @@ def _latest_scan(
     return scan
 
 
+def _runtime_target(
+    s: Session, scan: models.Scan, target_type: str, target_id: int
+):
+    model = {
+        "rule": models.BusinessRule,
+        "flow": models.BusinessFlow,
+        "chain": models.BusinessChain,
+    }.get(target_type)
+    if model is None:
+        raise HTTPException(400, "运行证据目标类型无效")
+    target = s.get(model, target_id)
+    if target is None or target.scan_id != scan.id:
+        raise HTTPException(404, "运行证据目标不存在")
+    return target
+
+
+def _validate_runtime_level(level: str, environment: str) -> None:
+    expected = {
+        "R1": {"test"},
+        "R2": {"controlled", "staging"},
+        "R3": {"production"},
+    }
+    if environment not in expected[level]:
+        labels = {
+            "R1": "测试（test）",
+            "R2": "受控或预发布（controlled/staging）",
+            "R3": "生产（production）",
+        }
+        raise HTTPException(400, f"{level} 只能记录{labels[level]}环境证据")
+
+
 def _env_flag(name: str) -> bool:
     return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
 
@@ -62,11 +163,15 @@ def _create_project_job(
     stage: str = "preparing",
 ) -> models.LabelJob:
     """Atomically claim the single background-job slot for a project."""
+    recover_stale_label_jobs(s)
+    now = models.utcnow()
     job = models.LabelJob(
         project_id=project_id,
         status="running",
         limit=limit,
         stage=stage,
+        started_at=now,
+        heartbeat_at=now,
     )
     s.add(job)
     try:
@@ -177,40 +282,24 @@ async def import_project(name: str = Form(...),
     project = models.Project(name=name.strip(), repo_path=str(proj_dir))
     s.add(project)
     s.flush()
-    job = models.LabelJob(project_id=project.id, status="running",
-                          stage="scan", total=0)
-    s.add(job)
-    s.commit()
+    job = _create_project_job(s, project.id, limit=0, stage="scan")
     job_id = job.id
 
     def _scan_worker(job_id: int, project_id: int, root: str, git_url: str | None):
-        from ..db import SessionLocal
         from ..scanner.service import scan_project
+        lease = _JobLease(job_id)
+        lease.start()
         ws = SessionLocal()
         try:
             result = None
 
             def cb(stage: str, done: int, total: int):
-                cs = SessionLocal()
-                try:
-                    j = cs.get(models.LabelJob, job_id)
-                    if j:
-                        j.stage = f"scan:{stage}"
-                        j.progress = done
-                        j.total = total
-                        cs.commit()
-                finally:
-                    cs.close()
+                _touch_project_job(job_id, stage=f"scan:{stage}",
+                                   progress=done, total=total)
 
             if git_url:
                 # Git 克隆（后台执行）
-                cs = SessionLocal()
-                try:
-                    j = cs.get(models.LabelJob, job_id)
-                    j.stage = "git-clone"
-                    cs.commit()
-                finally:
-                    cs.close()
+                _touch_project_job(job_id, stage="git-clone")
                 r = subprocess.run(
                     [
                         "git", "-c", "protocol.file.allow=never",
@@ -249,6 +338,7 @@ async def import_project(name: str = Form(...),
                 fs.close()
         finally:
             ws.close()
+            lease.stop()
 
     threading.Thread(target=_scan_worker,
                      args=(job_id, project.id, str(proj_dir), normalized_git_url),
@@ -280,6 +370,8 @@ def delete_project(pid: int, delete_files: bool = True,
 
     # 按引用顺序清理（PG 强制外键）
     for sid in scan_ids:
+        s.query(models.RuntimeEvidence).filter(
+            models.RuntimeEvidence.scan_id == sid).delete(synchronize_session=False)
         s.query(models.Confirmation).filter(
             models.Confirmation.scan_id == sid).delete(synchronize_session=False)
         s.query(models.Question).filter(
@@ -636,20 +728,33 @@ def biz_objects(pid: int, s: Session = Depends(get_session)):
 @router.get("/projects/{pid}/flows")
 def biz_flows(pid: int, s: Session = Depends(get_session)):
     """业务流程清单（S4）。"""
+    from ..runtime_evidence import (
+        evidence_by_target, runtime_level, serialize_evidence,
+    )
+
     scan = _latest_scan(s, pid)
     rows = s.execute(
         select(models.BusinessFlow).where(models.BusinessFlow.scan_id == scan.id)
         .order_by(models.BusinessFlow.id)).scalars().all()
+    runtime = evidence_by_target(s, scan.id, "flow", (row.id for row in rows))
     return [{"id": r.id, "name": r.name, "description": r.description,
              "entry_name": r.entry_name,
              "business_steps": r.business_steps or [],
              "tech_steps": r.tech_steps or [], "confidence": r.confidence,
-             "confirmed": r.confirmed} for r in rows]
+             "confirmed": r.confirmed,
+             "runtime_level": runtime_level(runtime.get(r.id, [])),
+             "runtime_evidence": [
+                 serialize_evidence(item) for item in runtime.get(r.id, [])
+             ]} for r in rows]
 
 
 @router.get("/projects/{pid}/chain")
 def biz_chain(pid: int, s: Session = Depends(get_session)):
     """业务推演（S6）：驱动关系 + 业务主线 + 设计叙事。"""
+    from ..runtime_evidence import (
+        evidence_by_target, runtime_level, serialize_evidence,
+    )
+
     scan = _latest_scan(s, pid)
     chain = s.execute(
         select(models.BusinessChain)
@@ -675,6 +780,9 @@ def biz_chain(pid: int, s: Session = Depends(get_session)):
     confidence = chain.confidence
     if not relationships:
         confidence = min(confidence, 30)
+    runtime_items = evidence_by_target(s, scan.id, "chain", [chain.id]).get(
+        chain.id, []
+    )
     return {
         "has_chain": True, "id": chain.id,
         "mainline": chain.mainline or [],
@@ -682,8 +790,113 @@ def biz_chain(pid: int, s: Session = Depends(get_session)):
         "design_narrative": chain.design_narrative,
         "assumptions": assumptions,
         "confidence": confidence, "model": chain.model,
+        "runtime_level": runtime_level(runtime_items),
+        "runtime_evidence": [serialize_evidence(item) for item in runtime_items],
         "created_at": str(chain.created_at),
     }
+
+
+@router.get("/projects/{pid}/runtime-evidence")
+def runtime_evidence_list(
+    pid: int,
+    target_type: Literal["rule", "flow", "chain"] | None = None,
+    target_id: int | None = Query(default=None, gt=0),
+    limit: int = Query(500, ge=1, le=2000),
+    s: Session = Depends(get_session),
+):
+    """List runtime facts without mixing them into static confidence."""
+    from ..runtime_evidence import runtime_level, serialize_evidence
+
+    scan = _latest_scan(s, pid)
+    if (target_type is None) != (target_id is None):
+        raise HTTPException(400, "target_type 与 target_id 必须同时提供")
+    query = select(models.RuntimeEvidence).where(
+        models.RuntimeEvidence.scan_id == scan.id
+    )
+    if target_type is not None and target_id is not None:
+        _runtime_target(s, scan, target_type, target_id)
+        query = query.where(
+            models.RuntimeEvidence.target_type == target_type,
+            models.RuntimeEvidence.target_id == target_id,
+        )
+    rows = s.execute(
+        query.order_by(models.RuntimeEvidence.id.desc()).limit(limit)
+    ).scalars().all()
+    return {
+        "runtime_level": runtime_level(rows),
+        "items": [serialize_evidence(row) for row in rows],
+    }
+
+
+@router.post("/projects/{pid}/runtime-evidence")
+def runtime_evidence_create(
+    pid: int,
+    body: RuntimeEvidenceIn,
+    s: Session = Depends(get_session),
+):
+    """Record a test/controlled/production observation for one conclusion."""
+    from ..runtime_evidence import runtime_level, serialize_evidence
+
+    scan = _latest_scan(s, pid)
+    _runtime_target(s, scan, body.target_type, body.target_id)
+    _validate_runtime_level(body.level, body.environment)
+    summary = body.summary.strip()
+    if not summary:
+        raise HTTPException(400, "运行证据摘要不能为空")
+    observed_at = body.observed_at
+    if observed_at is not None and observed_at.tzinfo is not None:
+        observed_at = observed_at.astimezone(UTC).replace(tzinfo=None)
+    item = models.RuntimeEvidence(
+        scan_id=scan.id,
+        target_type=body.target_type,
+        target_id=body.target_id,
+        level=body.level,
+        evidence_type=body.evidence_type,
+        environment=body.environment,
+        summary=summary,
+        reference=(body.reference or "").strip() or None,
+        observed_at=observed_at,
+        created_by=(body.created_by or "").strip() or "local-user",
+    )
+    s.add(item)
+    s.commit()
+    s.refresh(item)
+    all_items = s.execute(
+        select(models.RuntimeEvidence).where(
+            models.RuntimeEvidence.scan_id == scan.id,
+            models.RuntimeEvidence.target_type == body.target_type,
+            models.RuntimeEvidence.target_id == body.target_id,
+        )
+    ).scalars().all()
+    return {
+        "ok": True,
+        "runtime_level": runtime_level(all_items),
+        "item": serialize_evidence(item),
+    }
+
+
+@router.delete("/projects/{pid}/runtime-evidence/{evidence_id}")
+def runtime_evidence_delete(
+    pid: int, evidence_id: int, s: Session = Depends(get_session)
+):
+    """Remove an incorrectly entered local runtime evidence record."""
+    from ..runtime_evidence import runtime_level
+
+    scan = _latest_scan(s, pid)
+    item = s.get(models.RuntimeEvidence, evidence_id)
+    if item is None or item.scan_id != scan.id:
+        raise HTTPException(404, "运行证据不存在")
+    target_type, target_id = item.target_type, item.target_id
+    s.delete(item)
+    s.commit()
+    remaining = s.execute(
+        select(models.RuntimeEvidence).where(
+            models.RuntimeEvidence.scan_id == scan.id,
+            models.RuntimeEvidence.target_type == target_type,
+            models.RuntimeEvidence.target_id == target_id,
+        )
+    ).scalars().all()
+    return {"ok": True, "runtime_level": runtime_level(remaining)}
 
 
 @router.get("/documents/types")
@@ -794,8 +1007,6 @@ def confirm_rules_batch(
     for rule in rules:
         before = _rule_audit_snapshot(rule)
         if body.action == "confirm":
-            if rule.state != models.RuleState.CONFIRMED:
-                rule.confidence = min(100, rule.confidence + 10)
             rule.state = models.RuleState.CONFIRMED
         else:
             rule.state = models.RuleState.DISCARDED
@@ -820,6 +1031,7 @@ def export_rules(
     """导出规则清单为 Excel；默认只包含已确认或人工修改的规则。"""
     from fastapi.responses import Response
     from openpyxl import Workbook
+    from ..runtime_evidence import evidence_by_target, runtime_level
     scan = _latest_scan(s, pid)
     states = [models.RuleState.CONFIRMED, models.RuleState.MODIFIED]
     if include_unconfirmed:
@@ -830,12 +1042,13 @@ def export_rules(
             models.BusinessRule.state.in_(states),
         ).order_by(models.BusinessRule.confidence.desc())
     ).scalars().all()
+    runtime = evidence_by_target(s, scan.id, "rule", (row.id for row in rows))
     wb = Workbook()
     ws = wb.active
     ws.title = "业务规则清单"
     headers = ["规则名称", "类型", "模块", "触发方式", "前置条件", "处理逻辑",
                "状态变化", "数据变化", "后续动作", "异常处理", "影响范围",
-               "证据文件", "证据行", "可信度", "确认状态"]
+               "证据文件", "证据行", "AI可信度", "静态证据", "运行验证", "人工确认状态"]
     ws.append(headers)
     for r in rows:
         values = [
@@ -844,11 +1057,13 @@ def export_rules(
             r.data_change, r.follow_up, r.exception, r.impact,
             r.evidence_file, str(r.evidence_lines or []),
             r.confidence,
+            "已定位" if r.evidence_file and r.evidence_lines else "未定位",
+            runtime_level(runtime.get(r.id, [])),
             r.state.value if hasattr(r.state, "value") else str(r.state),
         ]
         ws.append([_excel_safe(value) for value in values])
-    for col, w in zip("ABCDEFGHIJKLMNO", [28, 12, 22, 20, 24, 46, 20, 24, 20,
-                                          20, 20, 34, 12, 8, 12]):
+    for col, w in zip("ABCDEFGHIJKLMNOPQ", [28, 12, 22, 20, 24, 46, 20, 24, 20,
+                                            20, 20, 34, 12, 10, 16, 10, 14]):
         ws.column_dimensions[col].width = w
     bio = __import__("io").BytesIO()
     wb.save(bio)
@@ -923,9 +1138,6 @@ def get_module_analysis(pid: int, mid: int, s: Session = Depends(get_session)):
 @router.post("/projects/{pid}/modules/analyze-all")
 def analyze_all_modules(pid: int):
     """批量模块需求规格分析（异步，job 轮询 /label-jobs/{id}）。"""
-    import threading
-    from ..db import SessionLocal
-
     s = SessionLocal()
     try:
         scan = _latest_scan(s, pid)
@@ -936,6 +1148,8 @@ def analyze_all_modules(pid: int):
             from concurrent.futures import ThreadPoolExecutor
             from ..llm import LLMClient
             from ..semantics.module_analysis import analyze_module as do_analyze
+            lease = _JobLease(job_id)
+            lease.start()
             ws = SessionLocal()
             try:
                 scan = ws.get(models.Scan, scan_id)
@@ -961,12 +1175,7 @@ def analyze_all_modules(pid: int):
                 errors: list[str] = []
                 ws.close()
 
-                ts = SessionLocal()
-                job = ts.get(models.LabelJob, job_id)
-                job.total = total
-                job.progress = done
-                ts.commit()
-                ts.close()
+                _touch_project_job(job_id, progress=done, total=total)
 
                 # 并发分析：每模块独立 session，避免事务串扰与唯一约束冲突
                 client = LLMClient()
@@ -990,15 +1199,8 @@ def analyze_all_modules(pid: int):
                             failed += 1
                             if len(errors) < 20:
                                 errors.append(error_message[:500])
-                        cs2 = SessionLocal()
-                        try:
-                            j = cs2.get(models.LabelJob, job_id)
-                            if j:
-                                j.progress = done
-                                j.stage = f"modules:{m.name}"
-                                cs2.commit()
-                        finally:
-                            cs2.close()
+                        _touch_project_job(job_id, stage=f"modules:{m.name}",
+                                           progress=done, total=total)
 
                 with ThreadPoolExecutor(max_workers=6) as ex:
                     list(ex.map(work, pending))
@@ -1035,6 +1237,8 @@ def analyze_all_modules(pid: int):
                         fs.commit()
                 finally:
                     fs.close()
+            finally:
+                lease.stop()
 
         threading.Thread(target=_worker, args=(job_id, scan.id), daemon=True).start()
         return {"ok": True, "job_id": job_id}
@@ -1114,6 +1318,7 @@ def rerun_chain(pid: int, force: bool = True):
     from ..db import SessionLocal
     from ..llm import LLMClient
     from ..semantics.chain import run_chain as do_chain
+    from ..runtime_evidence import delete_for_targets
     s = SessionLocal()
     try:
         scan = _latest_scan(s, pid)
@@ -1127,6 +1332,13 @@ def rerun_chain(pid: int, force: bool = True):
             s.rollback()
             raise HTTPException(400, "推演失败：对象不足")
         s.flush()
+        replaced_ids = list(s.execute(
+            select(models.BusinessChain.id).where(
+                models.BusinessChain.scan_id == scan.id,
+                models.BusinessChain.id != chain.id,
+            )
+        ).scalars().all())
+        delete_for_targets(s, scan.id, "chain", replaced_ids)
         s.query(models.BusinessChain).filter(
             models.BusinessChain.scan_id == scan.id,
             models.BusinessChain.id != chain.id,
@@ -1171,6 +1383,8 @@ def rules(pid: int, rule_type: models.RuleType | None = None,
           min_confidence: int | None = Query(None, ge=0, le=100),
           limit: int = Query(500, ge=1, le=5000),
           s: Session = Depends(get_session)):
+    from ..runtime_evidence import evidence_by_target, runtime_level
+
     scan = _latest_scan(s, pid)
     q = select(models.BusinessRule).where(models.BusinessRule.scan_id == scan.id)
     if rule_type:
@@ -1185,6 +1399,7 @@ def rules(pid: int, rule_type: models.RuleType | None = None,
         q = q.where(models.BusinessRule.confidence >= min_confidence)
     q = q.order_by(models.BusinessRule.confidence.desc()).limit(limit)
     rows = s.execute(q).scalars().all()
+    runtime = evidence_by_target(s, scan.id, "rule", (row.id for row in rows))
     return [{"id": r.id, "name": r.name,
              "rule_type": r.rule_type.value if hasattr(r.rule_type, "value") else str(r.rule_type),
              "module": r.module, "domain_id": r.domain_id,
@@ -1196,15 +1411,21 @@ def rules(pid: int, rule_type: models.RuleType | None = None,
              "evidence_lines": r.evidence_lines,
              "confidence": r.confidence,
              "state": r.state.value if hasattr(r.state, "value") else str(r.state),
+             "runtime_level": runtime_level(runtime.get(r.id, [])),
              "model": r.model, "source_method_id": r.source_method_id} for r in rows]
 
 
 @router.get("/projects/{pid}/rules/{rid}")
 def rule_detail(pid: int, rid: int, s: Session = Depends(get_session)):
+    from ..runtime_evidence import (
+        evidence_by_target, runtime_level, serialize_evidence,
+    )
+
     scan = _latest_scan(s, pid)
     r = s.get(models.BusinessRule, rid)
     if r is None or r.scan_id != scan.id:
         raise HTTPException(404, "规则不存在")
+    runtime_items = evidence_by_target(s, scan.id, "rule", [r.id]).get(r.id, [])
     return {"id": r.id, "name": r.name,
             "rule_type": r.rule_type.value if hasattr(r.rule_type, "value") else str(r.rule_type),
             "module": r.module, "domain_id": r.domain_id,
@@ -1216,6 +1437,8 @@ def rule_detail(pid: int, rid: int, s: Session = Depends(get_session)):
             "evidence_snippet": r.evidence_snippet,
             "confidence": r.confidence,
             "state": r.state.value if hasattr(r.state, "value") else str(r.state),
+            "runtime_level": runtime_level(runtime_items),
+            "runtime_evidence": [serialize_evidence(item) for item in runtime_items],
             "model": r.model, "raw": r.raw,
             "source_method_id": r.source_method_id, "created_at": str(r.created_at)}
 
@@ -1359,8 +1582,6 @@ def confirm_rule(pid: int, rid: int, body: ConfirmIn,
     before = _rule_audit_snapshot(rule)
 
     if body.action == "confirm":
-        if rule.state != models.RuleState.CONFIRMED:
-            rule.confidence = min(100, rule.confidence + 10)
         rule.state = models.RuleState.CONFIRMED
     elif body.action == "discard":
         rule.state = models.RuleState.DISCARDED
@@ -1448,9 +1669,6 @@ class LabelIn(BaseModel):
 @router.post("/projects/{pid}/label")
 def run_label_api(pid: int, body: LabelIn):
     """触发 AI 语义标注（异步：立即返回 job_id，按项目轮询任务状态）。"""
-    import threading
-    from ..db import SessionLocal
-
     s = SessionLocal()
     try:
         project = s.get(models.Project, pid)
@@ -1461,6 +1679,8 @@ def run_label_api(pid: int, body: LabelIn):
 
         def _worker(job_id: int, limit: int, concurrency: int, entry_only: bool):
             from ..semantics.run import run_label
+            lease = _JobLease(job_id)
+            lease.start()
             ws = SessionLocal()
             try:
                 job = ws.get(models.LabelJob, job_id)
@@ -1469,16 +1689,8 @@ def run_label_api(pid: int, body: LabelIn):
                 def cb(done: int, total: int, stage: str):
                     # 独立短连接：回调在标注线程池线程中执行，
                     # 不能共享 run_label 的 session（跨线程会破坏事务）
-                    cs = SessionLocal()
-                    try:
-                        j = cs.get(models.LabelJob, job_id)
-                        if j:
-                            j.progress = done
-                            j.total = total
-                            j.stage = stage
-                            cs.commit()
-                    finally:
-                        cs.close()
+                    _touch_project_job(job_id, stage=stage,
+                                       progress=done, total=total)
 
                 result = run_label(ws, pid, limit=limit,
                                    concurrency=concurrency,
@@ -1499,6 +1711,7 @@ def run_label_api(pid: int, body: LabelIn):
                     ws.commit()
             finally:
                 ws.close()
+                lease.stop()
 
         threading.Thread(target=_worker, args=(job_id, body.limit,
                                                body.concurrency,
@@ -1521,6 +1734,9 @@ def label_job(pid: int, job_id: int, s: Session = Depends(get_session)):
         "progress": job.progress, "total": job.total,
         "limit": job.limit, "result": job.result, "error": job.error,
         "created_at": str(job.created_at),
+        "started_at": str(job.started_at) if job.started_at else None,
+        "heartbeat_at": str(job.heartbeat_at) if job.heartbeat_at else None,
+        "lease_seconds": job_lease_seconds(),
         "finished_at": str(job.finished_at) if job.finished_at else None,
     }
 

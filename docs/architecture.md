@@ -2,17 +2,24 @@
 
 > 依据：code-to-business-prd.md V1.0
 > 技术决策：Python 全栈 + 可选云 LLM Provider / Agent Native
-> 文档版本：V1.1
-> 日期：2026-08-05
+> 文档版本：V1.3
+> 更新日期：2026-08-09
+> 对应产品版本：C2B v0.2.0
 
-> **当前 MVP 实现边界（2026-08-08）**：本文同时保留了目标架构。当前代码仅实现
-> Java tree-sitter 扫描，任务执行使用进程内后台线程而非 Celery/Redis，数据库升级
+> **当前实现边界（2026-08-09）**：本文同时保留了目标架构，后续章节中出现 Celery、Redis、
+> Alembic、增量扫描、Vue→API 映射、自动运行证据采集和多节点并行，均为**目标设计而非当前能力**。
+> 当前扫描深度覆盖 Java tree-sitter、Spring MVC 注解、MyBatis XML 与 `.sql` 的语句级 SQL 证据；
+> Mapper XML 尚未与 Java Mapper 方法精确绑定，Vue→API 映射和 OpenTelemetry/日志自动采集尚未实现；当前已支持对规则、流程、业务推演手工记录 R1-R3 运行证据。任务执行使用进程内后台线程而非 Celery/Redis；线程任务通过
+> 数据库心跳租约保持进度，API 重启会将未完成任务明确标记为失败、供用户重新运行。数据库升级
 > 使用幂等的轻量增量迁移而非 Alembic，问答使用有上限的图谱关键词检索而非
 > embedding。调用目标无法可靠唯一解析时一律标记 `UNKNOWN`，不做臆测型静态边。
 > 正式文档只纳入人工确认的业务域、对象、流程和已确认/已修改规则；`--draft` 才包含 AI 未确认内容与 AI 主线。
 > 云端语义已支持 OpenAI Compatible 与 Anthropic Native；Agent Skills 默认使用当前 Agent 的模型，
 > 经由确定性证据导出和结构化校验导入业务语义，不需要另配外部 Key。Web 后台没有当前 Agent 会话，
-> 因此仅支持云端 Provider。
+> 因此仅支持云端 Provider。Web 当前是本地单团队部署：不含登录、角色权限或客户级访问隔离。
+> 第二样本与质量口径见 [quality-baseline.md](quality-baseline.md) 和
+> [validation/ruoyi-vue-2026-08.md](validation/ruoyi-vue-2026-08.md)。
+> R0-R3 的数据结构、API 与生命周期见 [runtime-evidence.md](runtime-evidence.md)。
 
 ---
 
@@ -36,7 +43,7 @@
                              │ REST API
                              ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  Web 工作台（Vue 3 + Element Plus + ECharts + AntV X6）      │
+│  Web 工作台（Vue 3 + Element Plus + ECharts）                │
 │  项目总览 / 业务地图 / 流程与规则 / 数据与接口 / 文档与验收    │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -53,19 +60,19 @@
 
 | 组件 | 选型 | 说明 |
 |---|---|---|
-| 代码解析 | tree-sitter（python 绑定） | Java/C++ 实现，解析快（10-50 万行/秒），支持增量解析（规模化需要）；javalang 作为回退方案 |
-| SQL 解析 | SQLGlot | 支持 MySQL/PostgreSQL 方言，可提取表/字段读写 |
-| 配置解析 | PyYAML / python-dotenv | application.yml、bootstrap.yml |
-| 图谱存储 | PostgreSQL 16 + JSONB | 关系模型表达"对象-关系-证据"，避免 Neo4j 运维成本；图上分析（PageRank、连通域）用 networkx 在扫描端离线计算，结果落 PG |
-| 任务队列 | Celery + Redis | AI 标注管线、大项目分片扫描的异步调度、断点续扫 |
-| Web 后端 | FastAPI + SQLAlchemy 2.0 + Alembic | 异步 API，pydantic 校验 |
-| 前端 | Vue 3 + Vite + Element Plus | 页面结构对齐 PRD 15 |
-| 图可视化 | ECharts（关系图/桑基图）+ AntV X6（流程图） | X6 支持编辑，用于人工调整流程 |
+| 代码解析 | tree-sitter-java（当前） | Java 类/方法/调用/注解；Spring MVC Mapping 已覆盖。C++、增量解析为目标设计 |
+| SQL 解析 | SQLGlot + Mapper XML/`.sql` 语句抽取（当前） | MySQL/PostgreSQL 方言；动态 XML 保留低置信度证据；尚未 Mapper↔Java 方法精确绑定 |
+| 配置解析 | 环境变量 + 轻量 `.env` 加载（当前） | 不等同于完整 application.yml / bootstrap.yml 分析 |
+| 图谱存储 | SQLite（开发）或 PostgreSQL（Web/共享）（当前） | SQLAlchemy 关系表；PageRank、连通域、图算法是后续设计 |
+| 任务执行 | API 进程内线程 + 心跳租约（当前） | 重启后失败并允许重试；Celery + Redis、断点续跑、多节点是后续设计 |
+| Web 后端 | FastAPI + SQLAlchemy 2.0 + 轻量幂等迁移（当前） | 当前不使用 Alembic |
+| 前端 | Vue 3 + Vite + Element Plus（当前） | 本地单团队工作台，不含产品内登录/角色权限 |
+| 图可视化 | ECharts（当前） | AntV X6 的可编辑流程能力为目标设计 |
 | 云端 LLM 接入 | 裸调 HTTP：OpenAI Compatible 或 Anthropic Messages API | 不引 LangChain；统一 `LLMClient` 适配层，兼容服务可配地址，Anthropic 使用原生协议 |
 | Agent Native | `export-evidence` → 当前 Agent 分析源码 → `import-semantic` | 仅 CLI / Skills；校验后原子入库，不伪装为服务端 Provider |
-| Embedding | OpenAI 兼容 embedding API 或本地 bge-m3 | 问答检索用，MVP 先走图谱检索为主、向量为辅 |
-| 文档生成 | Jinja2（Markdown/HTML）+ python-docx（Word）+ 简单 HTML→PDF | 优先 Markdown/Word，PDF 后置 |
-| 测试样本 | 开发期：若依 RuoYi-Vue（开源，约 15-20 万行，语义层主样本）；验收期：**真实遗留系统 n-s-modernization-origin**（富士通 APWORKS/JBK 老式批处理+GUI 系统，247 万行 Java，角色 = 规模化验证样本） | 样本已锁定 |
+| Embedding | 未作为当前主路径 | 当前问答使用有上限的图谱关键词检索 |
+| 文档生成 | Jinja2（Markdown）+ python-docx（Word）+ openpyxl（当前） | PDF 为后续能力 |
+| 测试样本 | RuoYi-Vue（确定性图谱回归）+ n-s-modernization-origin（历史 XL 规模样本） | 前者已有固定提交及 24 项回归；后者的性能历史数据须保留原始环境证据 |
 
 ---
 
@@ -73,17 +80,13 @@
 
 ### 3.1 扫描管线（Pipeline）
 
-每个阶段独立输出中间产物（JSON/parquet），支持**断点续扫**与**增量扫描**：
+当前扫描路径如下；断点续扫、增量扫描和独立 JSON/parquet 中间产物是目标设计：
 
 ```text
-stage 1 fetch     Git clone / checkout 指定版本
-stage 2 discover  文件清单、按顶层包名分片（规模化并行单位）
-stage 3 parse     tree-sitter 提取符号：类/方法/字段/注解/注释/行号
-stage 4 sql       提取 SQL：MyBatis XML、注解 SQL、字符串模板 SQL → SQLGlot 解析
-stage 5 ddl       解析建表语句 → 表/字段/索引/外键/枚举注释
-stage 6 frontend  Vue 路由、菜单、按钮 → Axios 请求（路径+方法）
-stage 7 config    解析 application.yml、权限注解、定时任务、MQ 监听
-stage 8 graph     汇聚为统一代码图谱 → 落库
+stage 1 discover  文件清单、规模/编码/历史目录探测、档位和分片计划
+stage 2 parse     tree-sitter 提取 Java 类/方法/注解/调用/字符串 SQL
+stage 3 resources 提取 MyBatis XML 与 `.sql` 的 statement/table SQL 证据
+stage 4 graph     汇聚模块、对象、调用边、Spring MVC API、SQL 和表 → 落库
 ```
 
 ### 3.2 关键分析细节（确定性层，全部不依赖 LLM）
@@ -91,16 +94,13 @@ stage 8 graph     汇聚为统一代码图谱 → 落库
 | 分析项 | 实现要点 |
 |---|---|
 | 方法调用图 | 按类内解析方法调用表达式 → 解析目标类型 → 跨类/跨包解析；解析不到（反射/动态）记为"中断节点" |
-| MyBatis 绑定 | Mapper 接口 ↔ XML `namespace` 匹配；SQL `id` ↔ 接口方法；XML 中 `${}` 动态 SQL 标记为低可信 |
-| Controller→Service→Mapper 链路 | 按依赖注入类型解析（构造器/字段/Spring 注解），追踪完整调用链 |
-| SQL 读写 | SQLGlot 输出 `表 × {insert/update/delete/select} × 字段`，关联到宿主方法 |
-| HTTP 调用 | RestTemplate / Feign / 前端 Axios 的 URL 提取；Feign 接口注解直接映射 |
-| 状态枚举 | 枚举类 + 字段名 hint（`status/state/type/flag`）启发式识别，结合 `@EnumValue` 等注解 |
-| 定时任务 | `@Scheduled`、Quartz 配置、`xxl-job` 注解 |
-| 消息消费者 | `@RabbitListener`、`@KafkaListener` 提取 topic/queue |
+| MyBatis 绑定 | 当前提取 XML statement/table 级证据，`${}` 保留低置信度；Mapper 接口 ↔ XML `namespace` / `id` 精确绑定为后续能力 |
+| Controller→Service→Mapper 链路 | 当前仅保存可静态解析的方法调用；不声称已完成依赖注入与 Mapper 绑定的全链追踪 |
+| SQL 读写 | SQLGlot 输出 `表 × {insert/update/delete/select}`；Java 字符串可关联宿主方法，XML 尚无 Java 方法关联 |
+| HTTP 调用 | 当前提取 Spring MVC Controller 的 Mapping；Feign、RestTemplate、前端 Axios 为后续能力 |
+| 状态枚举 / 定时 / MQ | 部分 Java 注解可作为候选证据；完整枚举映射、配置和消息语义为后续能力 |
 | 规则候选 | if 分支（含比较/数值运算）、`throw new XxxException("业务文案")`、校验方法、金额/数量字段运算、状态字段赋值、insert/update 语句 |
-| 前端↔后端映射 | Axios 路径与方法名 → 匹配 Controller `@RequestMapping` 组合路径 |
-| 数据血缘（MVP） | 方法级血缘：页面字段→接口返回字段→Service 方法→SQL select 字段→表字段；不做表达式级精确数据流（明确为 MVP 边界） |
+| 前端↔后端映射 / 数据血缘 | 尚未实现；仅在路线图中作为后续能力 |
 
 ### 3.3 证据模型
 
@@ -135,6 +135,7 @@ stage 8 graph     汇聚为统一代码图谱 → 落库
 | `business_rules` | 规则卡片 | type(校验/计算/状态/权限/触发/异常), name, desc, trigger, pre_condition, logic, status_change, data_change, follow_up, exception, impact, confidence, state(AI识别/待确认/已确认/已修改/已废弃/冲突) |
 | `rule_evidence` | 规则-证据关联 | rule_id, evidence_type, ref(文件/行/表/字段/调用链), confidence_factor |
 | `business_flows` / `flow_nodes` | 流程及节点 | entry_type(页面/API/MQ/定时), layer(business/tech), next_id, branch |
+| `runtime_evidence` | 独立运行证据 | scan_id, target_type(rule/flow/chain), target_id, level(R1-R3), environment, summary, reference, observed_at |
 | `questions` | 待确认项 | type, desc, suggestion, status |
 | `confirmations` | 人工确认流水 | user_id, target_type, target_id, action, before/after JSONB, ts |
 | `documents` | 生成文档 | type, template, content JSONB, export_path, scan_version |
@@ -188,14 +189,21 @@ S5 状态机还原    输入：状态字段+赋值点+枚举 → 输出：状态
 - 每条结论必须回填证据引用（文件/行号/表名/SQL id）；
 - 不确定的内容进 `questions` 表，不混入结论。
 
-### 5.5 可信度计算（继承 PRD 11）
+### 5.5 三条信任轴与 AI 可信度
 
-确定性层产出证据完整度 + 云端 LLM 自评一致度（若有）→ 规则引擎打分：
+当前实现严格分开以下信息，不计算“总可信分”：
+
+- 静态证据：代码文件/行号、调用、SQL，以及业务推演关系的 V1-V4；
+- 运行验证：R0 无证据、R1 测试执行、R2 受控/预发布环境、R3 生产环境；
+- 人工确认：AI 识别、已确认、已修改、已废弃、冲突等审计状态；
+- AI 可信度：语义生成阶段基于静态输入得出的辅助排序分数。
+
+确认规则或录入运行证据都不会修改 AI 可信度。历史目标公式保留如下，仅作为后续校准参考，当前代码不执行跨轴加分：
 
 ```text
 可信度 = 基础分(50)
-       + 调用链完整(+10) + 数据流证据(+10) + 运行时/测试证据(+10)
-       + 多处实现一致(+10) + 人工已确认(+10)
+       + 调用链完整(+10) + 数据流证据(+10)
+       + 多处实现一致(+10)
        - 反射/动态SQL(-10) - 外部系统不可见(-5) - 调用链中断(-10)
        - 逻辑冲突(-10) - 仅命名推断(-15)
 等级：高≥90 / 较高75-89 / 中50-74 / 低<50
@@ -223,6 +231,9 @@ GET    /api/projects/{id}/rules?type=&state= 规则清单
 GET    /api/projects/{id}/rules/{rule_id}    规则卡片详情（含证据）
 POST   /api/projects/{id}/rules/{rule_id}/confirm  人工确认/修改（版本化）
 GET    /api/projects/{id}/flows              业务流程
+GET    /api/projects/{id}/runtime-evidence   查询规则/流程/推演的运行证据
+POST   /api/projects/{id}/runtime-evidence   录入 R1/R2/R3 运行证据
+DELETE /api/projects/{id}/runtime-evidence/{evidence_id} 删除误录证据
 POST   /api/flows/{id}/nodes                 人工调整流程节点
 GET    /api/projects/{id}/lineage?field=     数据血缘
 GET    /api/projects/{id}/apis               接口清单
@@ -442,7 +453,7 @@ L3 边缘按需    长尾逻辑（低热度工具方法、罕见分支）按需�
 
 **做**：Java Spring Boot + Vue + MySQL 项目的全量确定性分析、核心语义标注、规则卡片、业务地图、API 链路、数据血缘（方法级）、可追溯问答、人工确认、Markdown/Word 文档、版本对比（手动触发）、**规模化执行引擎：秒级规模探测 → 自适应档位判定 → 分片并行（支持 200 万行+）→ 分层语义推进 + 增量扫描**。
 
-**不做（MVP 内）**：运行时分析（OpenTelemetry/日志接入）、自动 BPMN、代码生成、多语言解析、SaaS 多租户、完整分布式集群（多机扩展能力预留，单机 64GB 内先跑通）、向量库检索为主（图谱优先）。
+**不做（MVP 内）**：自动运行时采集（OpenTelemetry/APM/日志平台接入；当前仅支持运行证据手工录入与审计）、自动 BPMN、代码生成、多语言解析、SaaS 多租户、完整分布式集群（多机扩展能力预留，单机 64GB 内先跑通）、向量库检索为主（图谱优先）。
 
 ---
 

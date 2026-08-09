@@ -258,7 +258,7 @@ def _link_evidence(session: Session, scan_id: int,
 
 
 def _verify_level(score: int) -> tuple[str, str]:
-    """证据分 → 衡木式核实等级（对数分档，避免大数值饱和）：
+    """静态证据分 → V 等级（对数分档，避免大数值饱和）：
     ≥50 V4 多源强证据 / 10-49 V3 强证据 / 3-9 V2 部分证据 /
     1-2 V1 单一弱证据 / 0 V0 仅推断。"""
     if score >= 50:
@@ -343,7 +343,7 @@ def run_chain(s: Session, scan_id: int, client: LLMClient) -> dict | None:
 
     # 衡木理念：模型建议 + 确定性证据决定可信。V0 只能进入
     # assumptions，不得作为已证实关系或图上边展示。
-    # 核实等级：优先看有向证据（数据流/调用），再叠加无向关联证据
+    # V 静态证据等级：优先看有向证据（数据流/调用），再叠加无向关联证据
     annotated = []
     for r in rels:
         if not isinstance(r, dict):

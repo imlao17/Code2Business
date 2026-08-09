@@ -7,7 +7,9 @@ from sqlalchemy.orm import sessionmaker
 
 from c2b import models
 from c2b.db import Base
-from c2b.documents import _doc_acceptance, _doc_functions, _gather, _table
+from c2b.documents import (
+    _doc_acceptance, _doc_functions, _doc_rules, _gather, _table,
+)
 
 
 class DocumentTrustTests(unittest.TestCase):
@@ -144,6 +146,40 @@ class DocumentTrustTests(unittest.TestCase):
 
         self.assertIn(r"A\|B", rendered)
         self.assertIn("第一行<br>第二行", rendered)
+
+    def test_rule_document_shows_runtime_level_without_leaking_draft_targets(self):
+        confirmed = models.BusinessRule(
+            scan_id=self.scan.id, name="confirmed",
+            confidence=72, state=models.RuleState.CONFIRMED,
+        )
+        draft = models.BusinessRule(
+            scan_id=self.scan.id, name="draft",
+            state=models.RuleState.AI_LABELED,
+        )
+        self.s.add_all([confirmed, draft])
+        self.s.flush()
+        self.s.add_all([
+            models.RuntimeEvidence(
+                scan_id=self.scan.id, target_type="rule",
+                target_id=confirmed.id, level="R2", evidence_type="trace",
+                environment="staging", summary="staging passed",
+                reference="trace-123",
+            ),
+            models.RuntimeEvidence(
+                scan_id=self.scan.id, target_type="rule",
+                target_id=draft.id, level="R3", evidence_type="log",
+                environment="production", summary="draft only",
+            ),
+        ])
+        self.s.commit()
+
+        formal = _gather(self.s, self.scan.id)
+        rendered = _doc_rules(formal)
+
+        self.assertEqual(len(formal["runtime_evidence"]), 1)
+        self.assertIn("运行验证 | R2", rendered)
+        self.assertIn("staging passed", rendered)
+        self.assertNotIn("draft only", rendered)
 
 
 if __name__ == "__main__":

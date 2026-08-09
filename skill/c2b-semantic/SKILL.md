@@ -44,7 +44,7 @@ c2b module-specs <project_id> [--module <id>] [--name <模块名>] [--force]
 | business_rules | 规则卡片：类型/逻辑/状态数据变化/证据文件:行/可信度/确认状态 |
 | business_objects | 业务对象（实体级，如销售订单→order_tbl） |
 | business_flows | 业务流程（入口+调用链→业务步骤） |
-| business_chains | 业务推演：主线 + 驱动关系（V1-V4 核实等级；V0 只进入推断假设） |
+| business_chains | 业务推演：主线 + 驱动关系（V1-V4 静态证据等级；V0 只进入推断假设） |
 | module_analyses | 模块需求规格（含信息缺口清单） |
 
 ## 质量约束
@@ -52,3 +52,4 @@ c2b module-specs <project_id> [--module <id>] [--name <模块名>] [--force]
 - 规则数异常少（<候选数 10%）时检查：候选选择策略（工具方法过滤）是否生效
 - 业务域为"未归类"时提示用户重跑（分批聚类已内置）
 - 所有结论都有证据字段；人工确认在网页端「流程与规则」页完成
+- V 静态证据、R 运行验证和人工确认是独立维度；本 Skill 不会把 Agent 分析当成 R 证据。共享 Web 数据库时可在页面录入 R1-R3
