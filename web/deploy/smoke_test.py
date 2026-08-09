@@ -67,7 +67,11 @@ package smoke;
 @RequestMapping("/demo")
 class DemoController {
     @GetMapping("/users")
-    void users() {}
+    void users(int userId) {
+        if (userId <= 0) {
+            throw new IllegalArgumentException("userId must be positive");
+        }
+    }
 }
 """
     mapper = """\
