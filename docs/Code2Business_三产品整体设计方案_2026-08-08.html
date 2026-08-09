@@ -15,7 +15,7 @@
     <h1>Code2Business<br>当前技术架构与实现机制</h1>
     <p class="subtitle">解释这个项目如何把遗留代码转成可追溯、可确认、可导出的业务知识：它解决的是什么问题、每一步由什么组件完成，以及三个产品如何围绕同一内核运行。</p>
     <div class="claim"><b>核心判断：</b>项目不是让大模型“读完整个仓库后写一篇总结”。它先用确定性程序把代码事实抽出来，再让模型或当前 Agent 只对这些事实做业务语义归纳；最后由人工确认决定哪些内容能成为正式交付物。</div>
-    <div class="meta">文档性质：当前代码实现说明，而非客户方案或产品路线图<br>覆盖范围：<code>core/</code>、<code>web/</code>、<code>cli/</code>、<code>skill/</code> 的实际职责与数据路径<br>版本基线：2026-08-09；RuoYi-Vue 固定样本的 24 项确定性图谱断言已通过</div>
+    <div class="meta">文档性质：当前代码实现说明，而非客户方案或产品路线图<br>覆盖范围：<code>core/</code>、<code>web/</code>、<code>cli/</code>、<code>skill/</code> 的实际职责与数据路径<br>版本基线：2026-08-09；RuoYi-Vue 固定样本 24 项确定性图谱断言通过，首轮独立语义抽样 50 条中 47 条正确、3 条部分正确</div>
   </section>
 
   <section class="toc">
@@ -203,7 +203,7 @@ skill/                        # c2b-analyze / scan / semantic / docs 技能组</
     <h3>把项目放到实际工作中，建议这样理解</h3>
     <ol><li><b>扫描回答“系统客观上有什么”。</b>它能给出模块、入口、方法、调用、SQL、表及定位证据。</li><li><b>语义回答“这些结构可能表达什么业务”。</b>模型和 Agent 帮助把技术结构转译成业务语言，但输出必须受 schema 和证据约束。</li><li><b>确认回答“哪些结论可以当作项目事实”。</b>人工确认让交付物脱离模型的不确定性，成为可追责、可回溯的知识资产。</li><li><b>三个产品回答“团队以什么方式使用这套能力”。</b>浏览器协作选 Web，工程自动化选 CLI，已使用编码 Agent 的团队选 Skills。</li></ol>
     <div class="callout ok"><b>最终总结：</b>Code2Business 的真正产品能力，不是“AI 解释代码”，而是把遗留代码分析过程拆成可验证、可审计、可协作的知识生产流水线。确定性扫描提供底座，语义能力提高理解速度，人工确认建立最终信任边界，Web / CLI / Skills 则让不同角色以合适的方式进入这条流水线。</div>
-    <div class="foot">Code2Business v0.2.0 · 当前技术架构与实现机制 · 基于仓库实现整理 · 2026-08-09</div>
+    <div class="foot">Code2Business v0.2.1 · 当前技术架构与实现机制 · 基于仓库实现整理 · 2026-08-09</div>
   </section>
 </main>
 </body>

@@ -1,10 +1,10 @@
 # RuoYi-Vue 第二样本验证报告（2026-08）
 
-> 对应产品版本：C2B v0.2.0
+> 对应产品版本：C2B v0.2.1
 
 ## 结论
 
-RuoYi-Vue 已作为第二个、与富士通老式 Java 样本技术栈不同的验证样本完成确定性图谱扫描。该样本验证了 Spring MVC 无参/有参 Mapping 注解和 MyBatis XML SQL 的当前实现；它**尚未**完成独立人工语义评审，因此不能据此给出“业务规则准确率”。
+RuoYi-Vue 已作为第二个、与富士通老式 Java 样本技术栈不同的验证样本完成确定性图谱扫描，并完成首轮独立语义抽样。确定性基线为 24/24；归档的 71 条 Agent Native 规则中分层评审 50 条，47 条正确、3 条部分正确。94% 是这个固定提交和本次生成批次的严格正确率，不是跨项目通用准确率。
 
 ## 可复跑对象
 
@@ -70,11 +70,40 @@ PYTHONPATH=core/src python -m c2b.cli evaluate 1 \
 
 本次修正后结果为 **24 / 24 通过**。详细方法见 [../quality-baseline.md](../quality-baseline.md)。
 
+## 独立语义质量抽样
+
+本轮 Agent Native 从已导出的 500 个方法证据中生成 71 条规则；结构化导入对规则的文件、方法和
+行号执行原子校验，`grounding_errors=0`。生成快照见
+[../quality-fixtures/ruoyi-vue-semantic-result-2026-08.json](../quality-fixtures/ruoyi-vue-semantic-result-2026-08.json)。
+
+独立代码评审主体没有参与规则生成，并从 71 条中分层抽取恰好 50 条，逐条核对规则、直接证据和
+必要的 Service/Mapper 上下文。原始评审记录见
+[../quality-fixtures/ruoyi-vue-semantic-review-2026-08.csv](../quality-fixtures/ruoyi-vue-semantic-review-2026-08.csv)。
+
+| Verdict | 数量 | 比例 |
+|---|---:|---:|
+| `correct` | 47 | 94.0% |
+| `partly_correct` | 3 | 6.0% |
+| `incorrect` | 0 | 0% |
+| `insufficient_evidence` | 0 | 0% |
+| `not_applicable` | 0 | 0% |
+
+分层覆盖：校验 18、权限 9、触发 8、状态 5、计算 4、异常 4、其他 2。三条部分正确均为范围需要
+收窄，而非完全相反的结论：
+
+- 菜单列表只有非管理员按当前用户过滤，管理员查看全部；
+- 菜单名称是在同一父菜单下唯一，不是全局唯一；
+- 路由名称全局唯一，但路径是同级唯一，根目录路径另有唯一性约束。
+
+因此本批次可以报告“严格正确率 94%、正确或部分正确率 100%”，但必须连同样本数、提交、类型
+分布和三项修订一起披露，不能简写成产品通用准确率。
+
 ## 仍未验证或明确受限的能力
 
 - 不包含 Java Mapper Interface 与 XML statement 的精确绑定；
 - 不包含 Vue 请求到后端 API 的关联验证；
 - 不包含动态 SQL 分支条件的运行时取值验证；
-- 不包含任何 LLM/Agent 规则卡片的独立人工抽样；
-- 不包含真实 PostgreSQL、Docker Compose、生产数据量和客户网络条件下的性能测试；
+- 语义证据导出只覆盖 500/2,204 个方法，未覆盖的大部分 Service/Mapper 不能由本轮数字代表；
+- v0.2.1 CI 包含最小项目的真实 PostgreSQL/Docker Compose 主链路冒烟，但不包含生产数据量、
+  客户网络、外部模型或压力性能测试；
 - 不应以此报告宣传“所有 Spring/MyBatis 项目均已验证”。

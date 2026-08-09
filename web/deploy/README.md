@@ -1,6 +1,6 @@
 # Code2Business 网页端部署（形态①）
 
-> 当前部署包版本：v0.2.0。版本变化见[仓库变更日志](../../CHANGELOG.md)。
+> 当前部署包版本：v0.2.1。版本变化见[仓库变更日志](../../CHANGELOG.md)。
 
 一键启动：PG + API + 前端（nginx），浏览器打开 http://localhost:8080。
 默认只监听 `127.0.0.1`，不会直接暴露到局域网或公网。
@@ -78,6 +78,12 @@ docker compose logs -f api        # 查看 API 日志
 docker compose ps                 # 服务状态
 docker compose restart api        # 重启 API
 ```
+
+Compose 为 PostgreSQL、API 和前端都配置了健康检查，API 的 `/healthz` 会同时核对数据库连接；
+即使配置了 `C2B_API_TOKEN`，该探针仍可供容器平台使用且不会返回项目数据。`docker compose up -d --wait`
+会等三项均就绪后再返回。仓库 CI 还会上传一个最小 ZIP，经 nginx 调用 API 完成扫描，检查
+Spring API、MyBatis 表/SQL，并重启 API 验证 PostgreSQL 持久化。该自动化证明的是发布栈
+主链路可运行，不代替客户网络、真实数据规模或外部模型连通性验收。
 
 当前 MVP 的扫描、标注和模块规格任务在 API 进程内执行。API 重启时，正在执行的
 线程无法继续运行；启动后系统会把这些任务标记为失败，并给出“请重新运行”的原因，

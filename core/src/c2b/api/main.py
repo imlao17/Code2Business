@@ -3,11 +3,13 @@ import os
 import secrets
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from .. import __version__
-from ..db import init_db, recover_stale_label_jobs
+from ..db import get_session, init_db, recover_stale_label_jobs
 from .routes import router
 
 
@@ -23,6 +25,13 @@ async def _lifespan(_app: FastAPI):
 
 app = FastAPI(title="Code2Business API", version=__version__, lifespan=_lifespan)
 app.include_router(router)
+
+
+@app.get("/healthz")
+def healthz(session: Session = Depends(get_session)):
+    """Unprotected liveness/readiness probe that also verifies the database."""
+    session.execute(text("SELECT 1"))
+    return {"status": "ok", "version": __version__}
 
 
 @app.middleware("http")

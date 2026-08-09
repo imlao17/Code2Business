@@ -4,7 +4,7 @@
 > 技术决策：Python 全栈 + 可选云 LLM Provider / Agent Native
 > 文档版本：V1.3
 > 更新日期：2026-08-09
-> 对应产品版本：C2B v0.2.0
+> 对应产品版本：C2B v0.2.1
 
 > **当前实现边界（2026-08-09）**：本文同时保留了目标架构，后续章节中出现 Celery、Redis、
 > Alembic、增量扫描、Vue→API 映射、自动运行证据采集和多节点并行，均为**目标设计而非当前能力**。
@@ -20,6 +20,8 @@
 > 第二样本与质量口径见 [quality-baseline.md](quality-baseline.md) 和
 > [validation/ruoyi-vue-2026-08.md](validation/ruoyi-vue-2026-08.md)。
 > R0-R3 的数据结构、API 与生命周期见 [runtime-evidence.md](runtime-evidence.md)。
+> v0.2.1 的 GitHub CI 会复跑 Python、前端、wheel/文档检查，并以真实 Docker Compose +
+> PostgreSQL 完成最小项目的扫描、mock 语义、R1 证据、文档导出和 API 重启持久化验证。
 
 ---
 

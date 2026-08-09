@@ -1,6 +1,6 @@
 # 质量基线与验收方法
 
-> 对应产品版本：C2B v0.2.0（2026-08-09）
+> 对应产品版本：C2B v0.2.1（2026-08-09）
 
 本文定义当前 C2B 的质量口径。它将**确定性图谱正确性**与**语义业务结论正确性**分开记录，避免把“有静态证据”误写成“业务结论已验证”。
 
@@ -24,6 +24,7 @@
 | RuoYi-Vue | Spring Boot、Spring MVC、MyBatis XML、Vue | 框架化 Java 图谱回归与语义抽样主样本 | 所有 Spring 项目的通用质量 |
 
 RuoYi-Vue 的固定来源、提交和已知代码事实存放在 [quality-fixtures/ruoyi-vue-2026-08.json](quality-fixtures/ruoyi-vue-2026-08.json)。修改样本提交或断言时，必须在评审报告中说明原因，不能静默替换。
+本轮被评审的完整语义输入归档为 [quality-fixtures/ruoyi-vue-semantic-result-2026-08.json](quality-fixtures/ruoyi-vue-semantic-result-2026-08.json)，逐条结果归档为 [quality-fixtures/ruoyi-vue-semantic-review-2026-08.csv](quality-fixtures/ruoyi-vue-semantic-review-2026-08.csv)。
 
 ## 3. D 层：可复跑图谱基线
 
@@ -60,6 +61,33 @@ PYTHONPATH=core/src python -m c2b.cli evaluate <project-id> \
 
 对外报告至少同时披露：样本数、各 verdict 数量、`correct` 比例、`correct + partly_correct` 比例、按规则类型的分布，以及人工修订的主要原因。没有完成独立评审时，禁止声称“语义准确率”。
 
+### 当前 RuoYi-Vue 首轮结果
+
+固定提交共生成 71 条 Agent Native 规则，证据导入校验错误为 0；独立代码评审人分层抽取 50 条，
+逐条核对控制器证据，并在需要时追到 Service/Mapper 上下文。结果如下：
+
+| 指标 | 结果 |
+|---|---:|
+| 样本数 | 50 |
+| `correct` | 47 |
+| `partly_correct` | 3 |
+| `incorrect` / `insufficient_evidence` / `not_applicable` | 0 / 0 / 0 |
+| 严格正确率 | 94.0% |
+| 正确或部分正确率 | 100.0% |
+
+类型分布为：校验 18、权限 9、触发 8、状态 5、计算 4、异常 4、其他 2。三条部分正确都来自
+条件范围说宽：管理员/普通用户菜单范围、菜单名的同父级唯一性、路由名与路径不同层级的唯一性。
+它们的源码依据和修订文本保存在 CSV 中。CI 使用以下命令复核样本数、枚举、修订字段和统计：
+
+```bash
+python scripts/summarize_semantic_review.py \
+  docs/quality-fixtures/ruoyi-vue-semantic-review-2026-08.csv \
+  --expected-count 50
+```
+
+该数字只适用于这个固定提交和归档的 71 条生成批次，不得外推为所有 Spring 项目、所有模型或
+所有业务规则的通用准确率。
+
 ## 5. 当前门槛
 
 | 用途 | D 层 | S 层 |
@@ -68,4 +96,4 @@ PYTHONPATH=core/src python -m c2b.cli evaluate <project-id> \
 | 新客户试点 | 样本扫描成功，关键 API/SQL 断言按其技术栈补齐 | 至少 50 条独立人工评审，不输出未经审计的准确率 |
 | 对外交付 | 本项目 D 层结果归档 | 有抽样结果、修订记录和待确认项清单 |
 
-当前 RuoYi 结果见 [validation/ruoyi-vue-2026-08.md](validation/ruoyi-vue-2026-08.md)。它证明的是当前扫描器对该固定样本的确定性图谱能力，不代表 LLM 语义质量已经完成统计。
+当前 RuoYi 的图谱与首轮语义抽样结果见 [validation/ruoyi-vue-2026-08.md](validation/ruoyi-vue-2026-08.md)。新项目仍必须单独建立 D 层断言并执行 S 层抽样，不能复用这个百分比代替验收。

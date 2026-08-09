@@ -3,11 +3,11 @@
 > 依据：code-to-business-prd.md + mvp-tech-solution.md
 > 里程碑 M0-M6，总工期约 15 周（4 人配置），每任务含验收标准
 > 日期：2026-08-05
-> 当前实现对应：C2B v0.2.0
+> 当前实现对应：C2B v0.2.1
 
 > **阅读方式（2026-08-09）**：本 WBS 是目标路线和历史拆分，表中的任务、工期、技术栈及验收标准**不等于已经完成或当前承诺**。当前实现状态以根目录 README、`docs/architecture.md` 与 `docs/quality-baseline.md` 为准。
 
-> **当前证据快照**：已落地 OpenAI Compatible / Anthropic Native 云端 Provider，以及 CLI / Agent Skills 的 Agent Native 证据导出、结构化校验和导入路径；Web 因没有交互式 Agent 会话，仍只使用云端 Provider。RuoYi-Vue 固定提交已完成 Java / Spring MVC / MyBatis XML 的确定性图谱验证（24 项断言通过），详见 `docs/validation/ruoyi-vue-2026-08.md`。Web/API 已支持规则、流程和业务推演的 R1-R3 运行证据手工录入与审计；自动 OpenTelemetry/日志采集、业务规则独立人工抽样、Vue→API 映射、Celery/Redis 和多用户权限仍未完成。
+> **当前证据快照**：已落地 OpenAI Compatible / Anthropic Native 云端 Provider，以及 CLI / Agent Skills 的 Agent Native 证据导出、结构化校验和导入路径；Web 因没有交互式 Agent 会话，仍只使用云端 Provider。RuoYi-Vue 固定提交已完成 Java / Spring MVC / MyBatis XML 的确定性图谱验证（24 项断言通过）和首轮 50 条独立语义抽样（47 正确、3 部分正确），详见 `docs/validation/ruoyi-vue-2026-08.md`。GitHub CI 已覆盖回归、构建和最小 Docker/PostgreSQL 主链路；Web/API 已支持规则、流程和业务推演的 R1-R3 运行证据手工录入与审计。自动 OpenTelemetry/日志采集、Vue→API 映射和 Celery/Redis 仍未完成；多用户权限按本地单团队定位暂缓，不属于 v0.2.x 阻断项。
 
 ---
 
