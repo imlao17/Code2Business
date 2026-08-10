@@ -190,18 +190,93 @@ def _create_project_job(
     return job
 
 
+def _complete_project_job(job_id: int, *, result: dict | None = None,
+                          error: Exception | None = None) -> None:
+    """Persist the terminal state of a background project job."""
+    s = SessionLocal()
+    try:
+        job = s.get(models.LabelJob, job_id)
+        if job is None:
+            return
+        job.status = "failed" if error else "done"
+        job.finished_at = models.utcnow()
+        if error:
+            job.error = str(error)[:2000]
+        else:
+            job.result = result
+        s.commit()
+    finally:
+        s.close()
+
+
+def _scan_worker(job_id: int, project_id: int, root: str, project_name: str) -> None:
+    """Run deterministic scanning after code import has completed."""
+    from pathlib import Path
+    from ..scanner.service import scan_project
+
+    lease = _JobLease(job_id)
+    lease.start()
+    s = SessionLocal()
+    try:
+        def callback(stage: str, done: int, total: int) -> None:
+            _touch_project_job(job_id, stage=f"scan:{stage}",
+                               progress=done, total=total)
+
+        result = scan_project(s, Path(root), project_name,
+                              project_id=project_id, progress=callback)
+        _complete_project_job(
+            job_id,
+            result={"scan": "done", "stats": result["stats"],
+                    "tier": result["tier"]},
+        )
+    except Exception as exc:
+        _complete_project_job(job_id, error=exc)
+    finally:
+        s.close()
+        lease.stop()
+
+
+def _git_import_worker(job_id: int, root: str, git_url: str) -> None:
+    """Clone a Git source as an import task; it deliberately never scans."""
+    import shutil
+    import subprocess
+
+    lease = _JobLease(job_id)
+    lease.start()
+    try:
+        _touch_project_job(job_id, stage="import:git-clone")
+        result = subprocess.run(
+            [
+                "git", "-c", "protocol.file.allow=never",
+                "-c", "protocol.ext.allow=never",
+                "-c", "http.followRedirects=false",
+                "clone", "--depth", "1", "--", git_url, root,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=1800,
+        )
+        if result.returncode != 0:
+            shutil.rmtree(root, ignore_errors=True)
+            raise RuntimeError(f"Git 克隆失败: {result.stderr[:300]}")
+        _complete_project_job(job_id, result={"import": "done", "source": "git"})
+    except Exception as exc:
+        _complete_project_job(job_id, error=exc)
+    finally:
+        lease.stop()
+
+
 @router.post("/projects/import")
 async def import_project(name: str = Form(...),
                          file: UploadFile | None = File(None),
                          git_url: str | None = Form(None),
                          s: Session = Depends(get_session)):
-    """网页端创建项目：上传 zip 代码包或 Git 地址 → 自动扫描。
+    """网页端创建项目：上传 zip 代码包或 Git 地址，等待用户显式扫描。
 
-    流程：落盘 → 解压/克隆 → 创建项目 → 后台线程全流程扫描。
+    ZIP 在请求中安全解压；Git 克隆是独立的后台导入任务。两条路径都不会
+    自动启动扫描，使用户能先核对导入结果、再决定何时消耗扫描资源。
     """
     import shutil
-    import subprocess
-    import threading
     import zipfile
     from pathlib import Path as _Path
     from ..security import (
@@ -296,73 +371,54 @@ async def import_project(name: str = Form(...),
         shutil.rmtree(proj_dir, ignore_errors=True)
         raise HTTPException(500, f"代码导入失败: {e}")
 
-    # 创建项目 + 异步扫描（git clone 也在后台执行，请求秒回）
+    # 创建项目。ZIP 到此已可扫描；Git 仍需完成独立的克隆任务。
     project = models.Project(name=name.strip(), repo_path=str(proj_dir))
     s.add(project)
     s.flush()
-    job = _create_project_job(s, project.id, limit=0, stage="scan")
-    job_id = job.id
+    if normalized_git_url:
+        job = _create_project_job(s, project.id, limit=0, stage="import:git-clone")
+        threading.Thread(
+            target=_git_import_worker,
+            args=(job.id, str(proj_dir), normalized_git_url),
+            daemon=True,
+        ).start()
+        return {
+            "ok": True,
+            "project_id": project.id,
+            "job_id": job.id,
+            "import_status": "running",
+            "message": "项目已创建，正在后台克隆 Git 仓库",
+        }
 
-    def _scan_worker(job_id: int, project_id: int, root: str, git_url: str | None):
-        from ..scanner.service import scan_project
-        lease = _JobLease(job_id)
-        lease.start()
-        ws = SessionLocal()
-        try:
-            result = None
+    s.commit()
+    return {
+        "ok": True,
+        "project_id": project.id,
+        "job_id": None,
+        "import_status": "ready",
+        "message": "代码导入完成，可以开始扫描",
+    }
 
-            def cb(stage: str, done: int, total: int):
-                _touch_project_job(job_id, stage=f"scan:{stage}",
-                                   progress=done, total=total)
 
-            if git_url:
-                # Git 克隆（后台执行）
-                _touch_project_job(job_id, stage="git-clone")
-                r = subprocess.run(
-                    [
-                        "git", "-c", "protocol.file.allow=never",
-                        "-c", "protocol.ext.allow=never",
-                        "-c", "http.followRedirects=false",
-                        "clone", "--depth", "1", "--", git_url, root,
-                    ],
-                    capture_output=True, text=True, timeout=1800)
-                if r.returncode != 0:
-                    shutil.rmtree(root, ignore_errors=True)
-                    raise RuntimeError(f"Git 克隆失败: {r.stderr[:300]}")
+@router.post("/projects/{pid}/scan")
+def start_scan(pid: int, s: Session = Depends(get_session)):
+    """显式启动一次确定性扫描；导入与扫描之间不再隐式耦合。"""
+    from pathlib import Path
 
-            result = scan_project(ws, _Path(root), name.strip(),
-                                  project_id=project_id,
-                                  progress=cb)
-            fs = SessionLocal()
-            try:
-                j = fs.get(models.LabelJob, job_id)
-                j.status = "done"
-                j.result = {"scan": "done", "stats": result["stats"],
-                            "tier": result["tier"]}
-                j.finished_at = models.utcnow()
-                fs.commit()
-            finally:
-                fs.close()
-        except Exception as e:
-            fs = SessionLocal()
-            try:
-                j = fs.get(models.LabelJob, job_id)
-                if j:
-                    j.status = "failed"
-                    j.error = str(e)[:2000]
-                    j.finished_at = models.utcnow()
-                    fs.commit()
-            finally:
-                fs.close()
-        finally:
-            ws.close()
-            lease.stop()
+    project = s.get(models.Project, pid)
+    if project is None:
+        raise HTTPException(404, "项目不存在")
+    root = Path(project.repo_path)
+    if not root.is_dir() or not any(root.iterdir()):
+        raise HTTPException(409, "代码仍在导入、导入失败或目录为空，暂不能扫描")
 
-    threading.Thread(target=_scan_worker,
-                     args=(job_id, project.id, str(proj_dir), normalized_git_url),
-                     daemon=True).start()
-    return {"ok": True, "project_id": project.id, "job_id": job_id,
-            "message": "项目已创建，扫描任务后台运行中"}
+    job = _create_project_job(s, pid, limit=0, stage="scan:preparing")
+    threading.Thread(
+        target=_scan_worker,
+        args=(job.id, project.id, str(root), project.name),
+        daemon=True,
+    ).start()
+    return {"ok": True, "job_id": job.id, "message": "扫描任务已启动"}
 
 
 @router.delete("/projects/{pid}")
@@ -457,7 +513,7 @@ def delete_project(pid: int, delete_files: bool = True,
 
 @router.get("/projects/{pid}/pipeline")
 def pipeline(pid: int, s: Session = Depends(get_session)):
-    """项目处理流程状态：导入→扫描→标注→图谱→确认→导出。"""
+    """项目处理流程状态：导入→显式扫描→标注→图谱→确认→导出。"""
     project = s.get(models.Project, pid)
     if project is None:
         raise HTTPException(404, "项目不存在")
@@ -469,12 +525,22 @@ def pipeline(pid: int, s: Session = Depends(get_session)):
         select(models.LabelJob).where(models.LabelJob.project_id == pid)
         .order_by(models.LabelJob.id.desc()).limit(5)).scalars().all()
     running_job = next((j for j in jobs if j.status == "running"), None)
+    running_import = running_job if (
+        running_job and str(running_job.stage).startswith("import:")
+    ) else None
+    # ``git`` preserves the display of v0.2.2 jobs that combined clone + scan.
     running_scan = running_job if (running_job and
                                    str(running_job.stage).startswith(("scan", "git"))) else None
     running_label = running_job if (
         running_job
-        and not str(running_job.stage).startswith(("scan", "git", "modules"))
+        and not str(running_job.stage).startswith(
+            ("import:", "scan", "git", "modules")
+        )
     ) else None
+    failed_import = next((
+        j for j in jobs
+        if j.status == "failed" and str(j.stage).startswith("import:")
+    ), None)
 
     completed = [sc for sc in scans if sc.status == models.ScanStatus.DONE]
     scan_id = completed[-1].id if completed else None
@@ -504,7 +570,16 @@ def pipeline(pid: int, s: Session = Depends(get_session)):
                 "status": status, **(extra or {})}
 
     steps = []
-    steps.append(step("import", "导入代码", "/overview", "done"))
+    if running_import:
+        steps.append(step("import", "导入代码", "/overview", "running",
+                          {"stage": running_import.stage,
+                           "progress": running_import.progress,
+                           "total": running_import.total}))
+    elif failed_import:
+        steps.append(step("import", "导入代码", "/overview", "error",
+                          {"error": failed_import.error}))
+    else:
+        steps.append(step("import", "导入代码", "/overview", "done"))
     if not scan_done:
         if running_scan:
             steps.append(step("scan", "扫描分析", "/overview", "running",
@@ -539,9 +614,15 @@ def pipeline(pid: int, s: Session = Depends(get_session)):
     steps.append(step("export", "导出文档", "/documents",
                       "ready" if n_rules else "pending"))
 
-    # 当前应做步骤（第一个未完成的非导出步骤；全完成则导出）
-    next_step = next((st for st in steps if st["status"] == "pending"
-                      and st["key"] != "export"), None)
+    # 运行中的步骤优先展示，避免把“下一步标注”误显示为可执行。
+    next_step = next((st for st in steps if st["status"] == "running"), None)
+    if next_step is None:
+        # 导入失败必须先重新导入，避免把空目录误当成可扫描源码。
+        next_step = next((st for st in steps if st["status"] == "error"), None)
+    if next_step is None:
+        # 当前应做步骤（第一个未完成的非导出步骤；全完成则导出）
+        next_step = next((st for st in steps if st["status"] == "pending"
+                          and st["key"] != "export"), None)
     if next_step is None and all(st["status"] in ("done", "ready")
                                  for st in steps if st["key"] != "export"):
         next_step = steps[-1]

@@ -49,18 +49,26 @@
           <span v-if="pipeline.next.status === 'pending'">
             下一步：{{ pipeline.next.label }}
           </span>
+          <span v-else-if="pipeline.next.status === 'error'">
+            代码导入失败，请重新导入
+          </span>
+          <span v-else-if="pipeline.next.status === 'running'">
+            正在执行：{{ pipeline.next.label }}
+          </span>
           <span v-else>流程已完成，可导出交付文档</span>
-          <el-button size="small" type="primary" @click="goStep(pipeline.next)">
-            去执行
+          <el-button v-if="pipeline.next.status !== 'running'" size="small" type="primary"
+                     @click="goStep(pipeline.next)">
+            {{ pipeline.next.status === 'error' ? '重新导入' : '去执行' }}
           </el-button>
         </div>
       </div>
       <el-main class="main">
-        <router-view :pid="pid" :key="pid" @create-project="importOpen = true" />
+        <router-view :pid="pid" :key="pid" @create-project="importOpen = true"
+                     @start-scan="startScan" />
       </el-main>
       <QaFloat :pid="pid" />
 
-      <el-dialog v-model="importOpen" title="新建项目（导入代码并自动扫描）" width="520px">
+      <el-dialog v-model="importOpen" title="新建项目（导入代码）" width="520px">
         <el-form label-width="90px">
           <el-form-item label="项目名称" required>
             <el-input v-model="importForm.name" placeholder="如：订单管理系统" />
@@ -89,7 +97,7 @@
         </el-form>
         <template #footer>
           <el-button @click="importOpen = false">取消</el-button>
-          <el-button type="primary" :loading="importing" @click="doImport">导入并扫描</el-button>
+          <el-button type="primary" :loading="importing" @click="doImport">导入代码</el-button>
         </template>
       </el-dialog>
 
@@ -171,7 +179,7 @@ const providerHint = computed(() => llmForm.provider === 'anthropic'
   : '适用于 OpenAI、DeepSeek、Kimi、Ollama 及遵循 /chat/completions 的自建服务。')
 
 const stepStatus = st => ({
-  done: 'success', running: 'process', pending: 'wait', ready: 'wait'
+  done: 'success', running: 'process', pending: 'wait', ready: 'wait', error: 'error'
 }[st.status] || 'wait')
 
 const stepDesc = st => {
@@ -185,12 +193,15 @@ const stepDesc = st => {
   return ''
 }
 
-function goStep(st) {
+async function goStep(st) {
   if (!st?.page) return
   if (st.status === 'running') return
+  if (st.key === 'import' && st.status === 'error') {
+    importOpen.value = true
+    return
+  }
   if (st.key === 'scan' && st.status === 'pending') {
-    // 扫描未开始：引导到导入（重建项目）
-    ElMessage.info('请先通过「新建项目」导入代码完成扫描')
+    await startScan()
     return
   }
   if (st.key === 'label' && st.status === 'pending') {
@@ -198,6 +209,19 @@ function goStep(st) {
     return
   }
   routerPush(st.page)
+}
+
+async function startScan() {
+  if (!pid.value) return
+  try {
+    const r = (await api.post(`/projects/${pid.value}/scan`)).data
+    ElMessage.success(r.message || '扫描任务已启动')
+    await loadPipeline()
+    routerPush('/overview')
+  } catch (e) {
+    const detail = e?.response?.data?.detail || e?.message || String(e)
+    ElMessage.error(typeof detail === 'string' ? detail : JSON.stringify(detail))
+  }
 }
 
 async function loadPipeline() {
@@ -264,6 +288,20 @@ function onZipChange(file) {
   zipFile = file.raw
 }
 
+async function finishImport(projectId, originPid) {
+  stopImportPoll()
+  importing.value = false
+  importPercent.value = 100
+  importStatus.value = 'success'
+  ElMessage.success('代码导入完成，可以开始扫描')
+  importOpen.value = false
+  await loadProjects()
+  if (pid.value === originPid || !pid.value) {
+    pid.value = projectId
+    window.dispatchEvent(new CustomEvent('project-changed', { detail: projectId }))
+  }
+}
+
 async function doImport() {
   if (!importForm.name.trim()) {
     ElMessage.warning('请输入项目名称')
@@ -291,7 +329,7 @@ async function doImport() {
     fd.append('git_url', importForm.gitUrl.trim())
   }
   try {
-    // 导入包含 git clone/zip 解压，可能需要几分钟，用 10 分钟超时
+    // ZIP 解压在请求中完成；Git 克隆由导入任务异步执行。
     const r = (await api.post('/projects/import', fd, { timeout: 600000 })).data
     if (r.error) {
       ElMessage.error(r.error)
@@ -301,24 +339,18 @@ async function doImport() {
       stopImportPoll()
       return
     }
+    if (r.import_status === 'ready') {
+      await finishImport(r.project_id, originPid)
+      return
+    }
     importContext = { projectId: r.project_id, jobId: r.job_id, originPid }
-    importStage.value = '扫描中（代码图谱构建中）...'
+    importStage.value = '正在克隆 Git 仓库...'
     importTimer = setInterval(async () => {
       if (!importContext || importContext.jobId !== r.job_id) return
       try {
         const j = (await api.get(`/projects/${r.project_id}/label-jobs/${r.job_id}`)).data
         if (j.status === 'done') {
-          stopImportPoll()
-          importing.value = false
-          importPercent.value = 100
-          importStatus.value = 'success'
-          ElMessage.success('项目扫描完成，图谱已构建')
-          importOpen.value = false
-          await loadProjects()
-          if (pid.value === originPid || !pid.value) {
-            pid.value = r.project_id
-            window.dispatchEvent(new CustomEvent('project-changed', { detail: r.project_id }))
-          }
+          await finishImport(r.project_id, originPid)
         } else if (j.status === 'failed') {
           stopImportPoll()
           importing.value = false
@@ -327,7 +359,7 @@ async function doImport() {
         } else {
           const total = j.total || 100
           importPercent.value = Math.min(99, Math.round(j.progress / total * 100))
-          importStage.value = `扫描中：${j.stage || ''}（${j.progress}/${total}）`
+          importStage.value = `导入中：${j.stage || ''}（${j.progress}/${total}）`
         }
       } catch {
         // 轮询失败忽略，下轮重试

@@ -154,7 +154,8 @@ c2b import-semantic 1 --input semantic-result.json</div>
     <div class="code">浏览器上传 ZIP / 提交 Git URL
   → POST /api/projects/import
   → 校验“二选一”输入、大小、压缩包安全或 Git 出站地址
-  → 为项目创建安全的本地存储目录
+  → 为项目创建安全的本地存储目录；ZIP 解压完成，Git 在后台克隆
+  → 项目进入“待扫描”，用户核对后 POST /api/projects/{id}/scan
   → 后台线程调用 scan_project(...)
   → Scanner 落库并更新扫描状态
   → 前端按项目查询概览、模块、规则、流程、数据与文档</div>
@@ -203,7 +204,7 @@ skill/                        # c2b-analyze / scan / semantic / docs 技能组</
     <h3>把项目放到实际工作中，建议这样理解</h3>
     <ol><li><b>扫描回答“系统客观上有什么”。</b>它能给出模块、入口、方法、调用、SQL、表及定位证据。</li><li><b>语义回答“这些结构可能表达什么业务”。</b>模型和 Agent 帮助把技术结构转译成业务语言，但输出必须受 schema 和证据约束。</li><li><b>确认回答“哪些结论可以当作项目事实”。</b>人工确认让交付物脱离模型的不确定性，成为可追责、可回溯的知识资产。</li><li><b>三个产品回答“团队以什么方式使用这套能力”。</b>浏览器协作选 Web，工程自动化选 CLI，已使用编码 Agent 的团队选 Skills。</li></ol>
     <div class="callout ok"><b>最终总结：</b>Code2Business 的真正产品能力，不是“AI 解释代码”，而是把遗留代码分析过程拆成可验证、可审计、可协作的知识生产流水线。确定性扫描提供底座，语义能力提高理解速度，人工确认建立最终信任边界，Web / CLI / Skills 则让不同角色以合适的方式进入这条流水线。</div>
-    <div class="foot">Code2Business v0.2.2 · 当前技术架构与实现机制 · 基于仓库实现整理 · 2026-08-10</div>
+    <div class="foot">Code2Business v0.2.3 · 当前技术架构与实现机制 · 基于仓库实现整理 · 2026-08-10</div>
   </section>
 </main>
 </body>

@@ -1,6 +1,6 @@
 # Code2Business 网页端部署（形态①）
 
-> 当前部署包版本：v0.2.2。版本变化见[仓库变更日志](../../CHANGELOG.md)。
+> 当前部署包版本：v0.2.3。版本变化见[仓库变更日志](../../CHANGELOG.md)。
 
 一键启动：PG + API + 前端（nginx），浏览器打开 http://localhost:8080。
 默认只监听 `127.0.0.1`，不会直接暴露到局域网或公网。
@@ -22,6 +22,7 @@ URL-safe 的 PostgreSQL 密码。部署者应备份该 `.env`；它不是可提�
 首次启动后：
 1. 打开 http://localhost:8080
 2. 右上角「LLM 设置」选择 OpenAI Compatible（含 DeepSeek/OpenAI/自建兼容端）或 Anthropic Native（Claude），填入对应地址、模型和 Key（保存后即生效）
+3. 新建项目并导入 ZIP 或 Git 仓库；Git 克隆完成后，先在流程条或项目总览点击「开始扫描」，再进行 AI 标注与文档导出。导入不会自动扫描，便于先核对代码来源并将导入问题与扫描问题分开处理。
 
 ## 独立分发（离线部署到目标机器）
 

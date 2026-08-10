@@ -133,7 +133,7 @@ import api from '../api'
 import GuideBanner from '../components/GuideBanner.vue'
 
 const props = defineProps({ pid: { type: [Number, String], default: null } })
-const emit = defineEmits(['create-project'])
+const emit = defineEmits(['create-project', 'start-scan'])
 const router = useRouter()
 const loading = ref(false)
 const overview = ref(null)
@@ -165,8 +165,8 @@ const ruleTypePct = n => {
 }
 
 const guideMap = {
-  scan: { desc: '代码已上传，正在构建代码图谱（模块/类/调用关系），完成后即可进行 AI 标注。',
-          status: '扫描进行中', type: 'primary', action: '' },
+  scan: { desc: '代码已经导入。确认来源无误后，开始构建模块、类、调用关系和 SQL 图谱。',
+          status: '等待开始扫描', type: 'primary', action: '开始扫描' },
   label: { desc: '扫描已完成。点击「运行标注」让 AI 识别业务域、业务对象与规则卡片（375+ 条规则，耗时取决于代码量）。',
            status: '等待 AI 标注', type: 'warning', action: '运行标注' },
   graph: { desc: '标注完成，业务图谱已生成。到「业务对象与流程」「业务推演」查看识别结果。',
@@ -177,16 +177,29 @@ const guideMap = {
             status: '流程已完成', type: 'success', action: '导出交付文档', page: '/documents' }
 }
 
-const guideDesc = computed(() => guideMap[pipelineNext.value?.key]?.desc || '')
-const guideStatus = computed(() => guideMap[pipelineNext.value?.key]?.status || '')
-const guideStatusType = computed(() => guideMap[pipelineNext.value?.key]?.type || 'info')
-const guideAction = computed(() => guideMap[pipelineNext.value?.key]?.action || '')
+const guideDesc = computed(() => {
+  if (pipelineNext.value?.status === 'running') {
+    return `${pipelineNext.value.label}正在进行，请等待当前任务完成。`
+  }
+  return guideMap[pipelineNext.value?.key]?.desc || ''
+})
+const guideStatus = computed(() => pipelineNext.value?.status === 'running'
+  ? '任务进行中'
+  : (guideMap[pipelineNext.value?.key]?.status || ''))
+const guideStatusType = computed(() => pipelineNext.value?.status === 'running'
+  ? 'primary'
+  : (guideMap[pipelineNext.value?.key]?.type || 'info'))
+const guideAction = computed(() => pipelineNext.value?.status === 'running'
+  ? ''
+  : (guideMap[pipelineNext.value?.key]?.action || ''))
 
 function goGuide() {
   const g = guideMap[pipelineNext.value?.key]
   if (!g) return
   if (g.page) {
     router.push(g.page)
+  } else if (g.action === '开始扫描') {
+    emit('start-scan')
   } else if (g.action === '运行标注') {
     window.dispatchEvent(new CustomEvent('request-label'))
   }

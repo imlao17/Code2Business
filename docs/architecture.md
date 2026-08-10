@@ -4,7 +4,7 @@
 > 技术决策：Python 全栈 + 可选云 LLM Provider / Agent Native
 > 文档版本：V1.3
 > 更新日期：2026-08-10
-> 对应产品版本：C2B v0.2.2
+> 对应产品版本：C2B v0.2.3
 
 > **当前实现边界（2026-08-10）**：本文同时保留了目标架构，后续章节中出现 Celery、Redis、
 > Alembic、增量扫描、Vue→API 映射、自动运行证据采集和多节点并行，均为**目标设计而非当前能力**。
@@ -20,7 +20,8 @@
 > 第二样本与质量口径见 [quality-baseline.md](quality-baseline.md) 和
 > [validation/ruoyi-vue-2026-08.md](validation/ruoyi-vue-2026-08.md)。
 > R0-R3 的数据结构、API 与生命周期见 [runtime-evidence.md](runtime-evidence.md)。
-> v0.2.2 保留 ZIP 路径、符号链接、成员数量和解压量安全边界，并以大文件与整体压缩率识别异常
+> v0.2.3 将 Web 的“导入代码”和“开始扫描”拆成两个明确阶段：ZIP 导入完成即待扫描，Git 克隆
+> 完成后也待扫描；扫描只能由用户显式启动。该版本同时保留 v0.2.2 的 ZIP 路径、符号链接、成员数量和解压量安全边界，并以大文件与整体压缩率识别异常
 > 压缩包；高重复的小型遗留文本不会单独触发 zip bomb 拒绝。GitHub CI 会复跑 Python、前端、wheel/文档检查，并以真实 Docker Compose +
 > PostgreSQL 完成最小项目的扫描、mock 语义、R1 证据、文档导出和 API 重启持久化验证。
 
@@ -76,6 +77,16 @@
 | Embedding | 未作为当前主路径 | 当前问答使用有上限的图谱关键词检索 |
 | 文档生成 | Jinja2（Markdown）+ python-docx（Word）+ openpyxl（当前） | PDF 为后续能力 |
 | 测试样本 | RuoYi-Vue（确定性图谱回归）+ n-s-modernization-origin（历史 XL 规模样本） | 前者已有固定提交及 24 项回归；后者的性能历史数据须保留原始环境证据 |
+
+### Web 项目阶段边界（当前实现）
+
+```text
+安全导入（ZIP 解压 / Git 克隆） → 待扫描 → 用户显式开始扫描 → 代码图谱 → AI 标注 → 人工确认与导出
+```
+
+导入阶段只验证和保存源码，不创建 `scans` 记录；Git 克隆是带心跳的后台导入任务。`POST /api/projects/{id}/scan`
+才会申请项目唯一的后台任务槽并运行 `scan_project(...)`。这样上传、Git 连通性和扫描解析的失败能分别呈现和重试，
+也让用户能在真正消耗扫描资源前检查项目内容。
 
 ---
 
@@ -225,8 +236,8 @@ S5 状态机还原    输入：状态字段+赋值点+枚举 → 输出：状态
 ## 6. Web API（FastAPI 主要端点）
 
 ```text
-POST   /api/projects                         创建项目
-POST   /api/projects/{id}/scans              触发扫描（本地 CLI 或服务器端）
+POST   /api/projects/import                  导入 ZIP 或创建 Git 克隆任务（不扫描）
+POST   /api/projects/{id}/scan                显式触发一次 Web 确定性扫描
 GET    /api/projects/{id}/overview           系统全景统计
 GET    /api/projects/{id}/domains            业务域树
 GET    /api/projects/{id}/map                业务地图（子图数据）

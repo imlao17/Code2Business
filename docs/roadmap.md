@@ -3,7 +3,7 @@
 > 依据：code-to-business-prd.md + mvp-tech-solution.md
 > 里程碑 M0-M6，总工期约 15 周（4 人配置），每任务含验收标准
 > 日期：2026-08-05
-> 当前实现对应：C2B v0.2.2
+> 当前实现对应：C2B v0.2.3
 
 > **阅读方式（2026-08-10）**：本 WBS 是目标路线和历史拆分，表中的任务、工期、技术栈及验收标准**不等于已经完成或当前承诺**。当前实现状态以根目录 README、`docs/architecture.md` 与 `docs/quality-baseline.md` 为准。
 

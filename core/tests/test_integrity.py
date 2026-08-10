@@ -1,11 +1,16 @@
 import tempfile
 import time
 import unittest
+import asyncio
+import io
+import os
+import zipfile
 from datetime import timedelta
 from pathlib import Path
 from unittest.mock import patch
 
 from fastapi import HTTPException
+from starlette.datastructures import UploadFile
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
@@ -24,10 +29,12 @@ from c2b.api.routes import (
     confirm_rule,
     confirm_rules_batch,
     delete_project,
+    import_project,
     pipeline,
     runtime_evidence_create,
     runtime_evidence_delete,
     runtime_evidence_list,
+    start_scan,
 )
 from c2b.db import Base, make_engine, recover_stale_label_jobs
 
@@ -415,6 +422,80 @@ class BackgroundJobExclusionTests(DatabaseTestCase):
         self.assertEqual(recover_stale_label_jobs(self.s, force=True), 1)
         self.s.refresh(fresh)
         self.assertEqual(fresh.status, "failed")
+
+
+class ImportAndScanLifecycleTests(DatabaseTestCase):
+    def test_zip_import_only_creates_a_project_and_leaves_scan_pending(self):
+        archive = io.BytesIO()
+        with zipfile.ZipFile(archive, "w") as zf:
+            zf.writestr("legacy/src/App.java", "class App {}\n")
+        archive.seek(0)
+        upload = UploadFile(filename="legacy.zip", file=archive)
+        data_root = Path(self.tmp.name) / "data"
+
+        with patch.dict(os.environ, {"C2B_DATA_ROOT": str(data_root)}, clear=False):
+            result = asyncio.run(import_project(
+                name="import-only",
+                file=upload,
+                git_url=None,
+                s=self.s,
+            ))
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["import_status"], "ready")
+        self.assertIsNone(result["job_id"])
+        project = self.s.get(models.Project, result["project_id"])
+        self.assertTrue((Path(project.repo_path) / "src" / "App.java").is_file())
+        self.assertEqual(
+            self.s.query(models.Scan)
+            .filter(models.Scan.project_id == project.id)
+            .count(),
+            0,
+        )
+        flow = pipeline(project.id, self.s)
+        self.assertEqual(flow["steps"][0]["status"], "done")
+        self.assertEqual(flow["steps"][1]["key"], "scan")
+        self.assertEqual(flow["steps"][1]["status"], "pending")
+        self.assertEqual(flow["next"]["key"], "scan")
+
+    def test_start_scan_claims_a_dedicated_scan_job(self):
+        project = models.Project(name="ready-to-scan", repo_path=self.tmp.name)
+        self.s.add(project)
+        self.s.commit()
+
+        with patch("c2b.api.routes.threading.Thread") as worker:
+            result = start_scan(project.id, self.s)
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["message"], "扫描任务已启动")
+        job = self.s.get(models.LabelJob, result["job_id"])
+        self.assertEqual(job.status, "running")
+        self.assertEqual(job.stage, "scan:preparing")
+        self.assertEqual(
+            self.s.query(models.Scan)
+            .filter(models.Scan.project_id == project.id)
+            .count(),
+            0,
+        )
+        worker.assert_called_once()
+
+    def test_git_import_in_progress_blocks_scan_stage_in_pipeline(self):
+        project = models.Project(name="cloning", repo_path=self.tmp.name)
+        self.s.add(project)
+        self.s.flush()
+        self.s.add(models.LabelJob(
+            project_id=project.id,
+            status="running",
+            stage="import:git-clone",
+        ))
+        self.s.commit()
+
+        flow = pipeline(project.id, self.s)
+
+        self.assertEqual(flow["steps"][0]["status"], "running")
+        self.assertEqual(flow["steps"][1]["status"], "pending")
+        self.assertEqual(flow["next"]["key"], "import")
+        self.assertEqual(flow["next"]["status"], "running")
 
 
 class ExportSafetyTests(unittest.TestCase):

@@ -161,7 +161,14 @@ def create(state_file: Path) -> None:
         headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
     )
     project_id = int(result["project_id"])
-    job_id = int(result["job_id"])
+    if result.get("import_status") != "ready" or result.get("job_id") is not None:
+        raise AssertionError(f"ZIP import unexpectedly started scanning: {result!r}")
+    pending = request_json(f"/projects/{project_id}/pipeline")
+    scan_step = next(step for step in pending["steps"] if step["key"] == "scan")
+    if scan_step["status"] != "pending":
+        raise AssertionError(f"Expected a pending scan after import: {pending!r}")
+    scan = post_json(f"/projects/{project_id}/scan", {})
+    job_id = int(scan["job_id"])
     wait_for_job(project_id, job_id)
     assert_graph(project_id)
 
