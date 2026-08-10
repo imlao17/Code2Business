@@ -1,6 +1,6 @@
 # Code2Business（C2B）—— 从遗留代码还原业务知识
 
-> 当前正式版本：**[v0.2.1](https://github.com/imlao17/Code2Business/releases/tag/v0.2.1)（2026-08-09）**。
+> 当前正式版本：**[v0.2.2](https://github.com/imlao17/Code2Business/releases/tag/v0.2.2)（2026-08-10）**。
 > 版本变化见 [CHANGELOG.md](CHANGELOG.md)。本版本定位为“可本地试点、具备工程回归与运行证据第一版”，不等同于多租户商业交付版。
 
 Code2Business 把旧系统代码转换为可追溯、可确认、可交付的业务资产：

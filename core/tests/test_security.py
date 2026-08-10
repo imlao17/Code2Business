@@ -99,6 +99,58 @@ class SecurityBoundaryTests(unittest.TestCase):
                 with self.assertRaises(UnsafeArchiveError):
                     safe_extract_zip(zf, Path(td), max_uncompressed_bytes=128)
 
+    def test_zip_extraction_allows_small_highly_compressible_text(self):
+        """Repeated small logs are common in legacy-source archives, not bombs."""
+        from c2b.security import safe_extract_zip
+
+        payload = io.BytesIO()
+        with zipfile.ZipFile(payload, "w", zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("legacy-output.txt", "same line\n" * 10_000)
+        payload.seek(0)
+        with tempfile.TemporaryDirectory() as td, zipfile.ZipFile(payload) as zf:
+            safe_extract_zip(
+                zf,
+                Path(td),
+                max_compression_ratio=200,
+                min_member_compression_ratio_bytes=1024 * 1024,
+                max_total_compression_ratio=10_000,
+            )
+            self.assertTrue((Path(td) / "legacy-output.txt").is_file())
+
+    def test_zip_extraction_rejects_large_highly_compressible_member(self):
+        from c2b.security import UnsafeArchiveError, safe_extract_zip
+
+        payload = io.BytesIO()
+        with zipfile.ZipFile(payload, "w", zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("oversized-repeat.txt", "x" * (2 * 1024 * 1024))
+        payload.seek(0)
+        with tempfile.TemporaryDirectory() as td, zipfile.ZipFile(payload) as zf:
+            with self.assertRaises(UnsafeArchiveError):
+                safe_extract_zip(
+                    zf,
+                    Path(td),
+                    max_compression_ratio=100,
+                    min_member_compression_ratio_bytes=1024 * 1024,
+                    max_total_compression_ratio=10_000,
+                )
+
+    def test_zip_extraction_rejects_abnormal_total_compression_ratio(self):
+        from c2b.security import UnsafeArchiveError, safe_extract_zip
+
+        payload = io.BytesIO()
+        with zipfile.ZipFile(payload, "w", zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("first.txt", "x" * 4096)
+            zf.writestr("second.txt", "y" * 4096)
+        payload.seek(0)
+        with tempfile.TemporaryDirectory() as td, zipfile.ZipFile(payload) as zf:
+            with self.assertRaises(UnsafeArchiveError):
+                safe_extract_zip(
+                    zf,
+                    Path(td),
+                    max_compression_ratio=10_000,
+                    max_total_compression_ratio=10,
+                )
+
     def test_zip_extraction_rejects_symbolic_links(self):
         from c2b.security import UnsafeArchiveError, safe_extract_zip
 

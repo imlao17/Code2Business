@@ -108,10 +108,19 @@ def safe_extract_zip(
     destination: Path,
     *,
     max_members: int = 100_000,
-    max_uncompressed_bytes: int = 10 * 1024**3,
+    max_uncompressed_bytes: int = 2 * 1024**3,
+    max_member_uncompressed_bytes: int = 512 * 1024**2,
     max_compression_ratio: int = 200,
+    min_member_compression_ratio_bytes: int = 8 * 1024**2,
+    max_total_compression_ratio: int = 100,
 ) -> None:
-    """Extract ``archive`` with traversal, symlink and zip-bomb protection."""
+    """Extract an archive within path, member-count, size and bomb limits.
+
+    Small repeated text files (for example generated logs shipped with a
+    legacy repository) can compress hundreds of times without being a zip
+    bomb.  Per-member compression checks therefore start only above a
+    configurable size, while aggregate expansion remains bounded.
+    """
     root = destination.resolve()
     infos = archive.infolist()
     if len(infos) > max_members:
@@ -123,12 +132,28 @@ def safe_extract_zip(
             f"压缩包解压后超过限制（{max_uncompressed_bytes:,} 字节）"
         )
 
+    total_compressed_size = sum(info.compress_size for info in infos)
+    if (
+        total_size > 0
+        and total_compressed_size > 0
+        and total_size / total_compressed_size > max_total_compression_ratio
+    ):
+        raise UnsafeArchiveError(
+            "压缩包整体压缩率异常，疑似 zip bomb: "
+            f"{total_size / total_compressed_size:.1f}:1"
+        )
+
     for info in infos:
         mode = (info.external_attr >> 16) & 0o170000
         if mode == stat.S_IFLNK:
             raise UnsafeArchiveError(f"压缩包不允许符号链接: {info.filename}")
+        if info.file_size > max_member_uncompressed_bytes:
+            raise UnsafeArchiveError(
+                "压缩包单文件解压后超过限制"
+                f"（{max_member_uncompressed_bytes:,} 字节）: {info.filename}"
+            )
         if (
-            info.file_size > 0
+            info.file_size >= min_member_compression_ratio_bytes
             and info.compress_size > 0
             and info.file_size / info.compress_size > max_compression_ratio
         ):

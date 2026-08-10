@@ -254,7 +254,25 @@ async def import_project(name: str = Form(...),
                     proj_dir,
                     max_members=int(os.environ.get("C2B_MAX_ARCHIVE_FILES", "100000")),
                     max_uncompressed_bytes=int(
-                        os.environ.get("C2B_MAX_ARCHIVE_BYTES", str(10 * 1024**3))
+                        os.environ.get("C2B_MAX_ARCHIVE_BYTES", str(2 * 1024**3))
+                    ),
+                    max_member_uncompressed_bytes=int(
+                        os.environ.get(
+                            "C2B_MAX_ARCHIVE_MEMBER_BYTES", str(512 * 1024**2)
+                        )
+                    ),
+                    max_compression_ratio=int(
+                        os.environ.get("C2B_MAX_ARCHIVE_COMPRESSION_RATIO", "200")
+                    ),
+                    min_member_compression_ratio_bytes=int(
+                        os.environ.get(
+                            "C2B_MIN_ARCHIVE_RATIO_MEMBER_BYTES", str(8 * 1024**2)
+                        )
+                    ),
+                    max_total_compression_ratio=int(
+                        os.environ.get(
+                            "C2B_MAX_ARCHIVE_TOTAL_COMPRESSION_RATIO", "100"
+                        )
                     ),
                 )
             zip_path.unlink()

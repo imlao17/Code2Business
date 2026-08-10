@@ -3,10 +3,10 @@
 > 依据：code-to-business-prd.md V1.0
 > 技术决策：Python 全栈 + 可选云 LLM Provider / Agent Native
 > 文档版本：V1.3
-> 更新日期：2026-08-09
-> 对应产品版本：C2B v0.2.1
+> 更新日期：2026-08-10
+> 对应产品版本：C2B v0.2.2
 
-> **当前实现边界（2026-08-09）**：本文同时保留了目标架构，后续章节中出现 Celery、Redis、
+> **当前实现边界（2026-08-10）**：本文同时保留了目标架构，后续章节中出现 Celery、Redis、
 > Alembic、增量扫描、Vue→API 映射、自动运行证据采集和多节点并行，均为**目标设计而非当前能力**。
 > 当前扫描深度覆盖 Java tree-sitter、Spring MVC 注解、MyBatis XML 与 `.sql` 的语句级 SQL 证据；
 > Mapper XML 尚未与 Java Mapper 方法精确绑定，Vue→API 映射和 OpenTelemetry/日志自动采集尚未实现；当前已支持对规则、流程、业务推演手工记录 R1-R3 运行证据。任务执行使用进程内后台线程而非 Celery/Redis；线程任务通过
@@ -20,7 +20,8 @@
 > 第二样本与质量口径见 [quality-baseline.md](quality-baseline.md) 和
 > [validation/ruoyi-vue-2026-08.md](validation/ruoyi-vue-2026-08.md)。
 > R0-R3 的数据结构、API 与生命周期见 [runtime-evidence.md](runtime-evidence.md)。
-> v0.2.1 的 GitHub CI 会复跑 Python、前端、wheel/文档检查，并以真实 Docker Compose +
+> v0.2.2 保留 ZIP 路径、符号链接、成员数量和解压量安全边界，并以大文件与整体压缩率识别异常
+> 压缩包；高重复的小型遗留文本不会单独触发 zip bomb 拒绝。GitHub CI 会复跑 Python、前端、wheel/文档检查，并以真实 Docker Compose +
 > PostgreSQL 完成最小项目的扫描、mock 语义、R1 证据、文档导出和 API 重启持久化验证。
 
 ---

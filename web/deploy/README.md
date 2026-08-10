@@ -1,6 +1,6 @@
 # Code2Business 网页端部署（形态①）
 
-> 当前部署包版本：v0.2.1。版本变化见[仓库变更日志](../../CHANGELOG.md)。
+> 当前部署包版本：v0.2.2。版本变化见[仓库变更日志](../../CHANGELOG.md)。
 
 一键启动：PG + API + 前端（nginx），浏览器打开 http://localhost:8080。
 默认只监听 `127.0.0.1`，不会直接暴露到局域网或公网。
@@ -99,6 +99,16 @@ Spring API、MyBatis 表/SQL，并重启 API 验证 PostgreSQL 持久化。该�
 - 内网 / Docker / 宿主机模型：在可信网络内将 `.env` 的 `C2B_ALLOW_PRIVATE_LLM=1`，再运行 `docker compose up -d --force-recreate api`。这会放开 API 访问私网地址，不能与无认证的公网 Web 一起使用。
 - Docker Compose 内的模型服务可填写 `http://服务名:端口/v1`，例如 `http://ollama:11434/v1`；宿主机模型在 Docker Desktop 上通常使用 `http://host.docker.internal:11434/v1`。Linux 还需要为 `api` 服务配置 `extra_hosts: ["host.docker.internal:host-gateway"]`，并确保模型服务对 Docker 网桥可访问。
 - `C2B_ALLOW_PRIVATE_GIT` 与 LLM 开关独立，只有确需克隆内网 Git 时才设为 `1`。
+
+### ZIP 导入安全边界
+
+ZIP 导入始终会拒绝路径穿越、符号链接、超过文件数量/总解压量/单文件大小限制的内容。为避免
+老系统仓库中的重复日志、导出文本或模板文件被误判为 zip bomb，单文件压缩率只在文件达到
+`C2B_MIN_ARCHIVE_RATIO_MEMBER_BYTES`（默认 8 MiB）后检查；同时仍会检查整个压缩包的压缩率。
+
+默认限制见 `.env.example`：最多 100,000 个成员、解压总量最多 2 GiB、单文件最多 512 MiB、
+大文件压缩率最多 200:1、整体压缩率最多 100:1。仅在确认代码包可信且确有需要时才调大这些值；
+不要为解决单个小文本文件的误报而关闭全部安全限制。
 
 ## 远程访问与安全
 
