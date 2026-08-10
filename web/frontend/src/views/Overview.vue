@@ -140,6 +140,7 @@ const overview = ref(null)
 const domains = ref([])
 const pipelineNext = ref(null)
 let loadToken = 0
+let refreshTimer = null
 
 const statLabels = {
   modules: '模块', classes: '类', methods: '方法', call_edges: '调用边',
@@ -179,7 +180,9 @@ const guideMap = {
 
 const guideDesc = computed(() => {
   if (pipelineNext.value?.status === 'running') {
-    return `${pipelineNext.value.label}正在进行，请等待当前任务完成。`
+    const task = pipelineNext.value
+    const progress = task.total ? `（${task.progress || 0}/${task.total}）` : ''
+    return `${task.label}正在进行：${task.stage || '准备中'}${progress}。页面会自动刷新，完成后展示分析结果。`
   }
   return guideMap[pipelineNext.value?.key]?.desc || ''
 })
@@ -226,6 +229,16 @@ const cards = computed(() => {
 })
 const stats = computed(() => overview.value?.stats || null)
 
+function syncRefreshTimer() {
+  const running = pipelineNext.value?.status === 'running'
+  if (running && !refreshTimer) {
+    refreshTimer = setInterval(load, 5000)
+  } else if (!running && refreshTimer) {
+    clearInterval(refreshTimer)
+    refreshTimer = null
+  }
+}
+
 async function load() {
   const projectId = props.pid
   const token = ++loadToken
@@ -233,21 +246,26 @@ async function load() {
     overview.value = null
     domains.value = []
     pipelineNext.value = null
+    syncRefreshTimer()
     loading.value = false
     return
   }
   loading.value = true
   try {
-    const [overviewResp, domainsResp, pipelineResp] = await Promise.all([
+    // 流程状态在导入/扫描尚未完成时仍然可用；概览和业务域依赖已完成扫描，
+    // 因此不能让它们的 404 把进度提示一起吞掉。
+    const pipelineResp = await api.get(`/projects/${projectId}/pipeline`)
+    if (token !== loadToken || projectId !== props.pid) return
+    pipelineNext.value = pipelineResp.data.next
+    syncRefreshTimer()
+
+    const [overviewResp, domainsResp] = await Promise.allSettled([
       api.get(`/projects/${projectId}/overview`),
-      api.get(`/projects/${projectId}/domains`),
-      api.get(`/projects/${projectId}/pipeline`)
+      api.get(`/projects/${projectId}/domains`)
     ])
     if (token !== loadToken || projectId !== props.pid) return
-    overview.value = overviewResp.data
-    domains.value = domainsResp.data
-    const pl = pipelineResp.data
-    pipelineNext.value = pl.next
+    overview.value = overviewResp.status === 'fulfilled' ? overviewResp.value.data : null
+    domains.value = domainsResp.status === 'fulfilled' ? domainsResp.value.data : []
   } finally {
     if (token === loadToken) {
       loading.value = false
@@ -269,6 +287,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  if (refreshTimer) clearInterval(refreshTimer)
   window.removeEventListener('project-changed', handleProjectChanged)
 })
 </script>

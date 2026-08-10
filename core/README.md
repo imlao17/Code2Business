@@ -1,6 +1,6 @@
 # core —— C2B 共享引擎（非独立产品）
 
-> 当前分发版本：v0.2.3。完整变化见[仓库变更日志](../CHANGELOG.md)。
+> 当前分发版本：v0.2.4。完整变化见[仓库变更日志](../CHANGELOG.md)。
 
 `core/` 是三个 C2B 产品共用的 Python 实现：扫描器（确定性分析）、AI 语义层、文档引擎、Web API 与 CLI 入口。它不是第四个面向用户部署的产品：Web 部署会打包它，CLI 和 Agent Skills 会安装其 wheel。
 

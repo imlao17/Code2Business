@@ -181,8 +181,21 @@ class Scanner:
         self.s.add_all(module_cache.values())
         self.s.flush()
 
-        # 类与方法对象；符号索引 class.method -> CodeObject
-        obj_index: dict[tuple, models.CodeObject] = {}
+        # 类与方法对象。解析大仓库时不能让全量 ORM 实例常驻内存：
+        # 索引在每个批次 flush 后只保留数据库 ID，供后续调用/API/SQL 关联。
+        obj_index: dict[tuple, int] = {}
+        pending_objects: list[tuple[tuple, models.CodeObject]] = []
+        class_count = 0
+        method_count = 0
+
+        def flush_objects() -> None:
+            if not pending_objects:
+                return
+            self.s.flush()
+            for key, obj in pending_objects:
+                obj_index[key] = obj.id
+            pending_objects.clear()
+
         for pf in self._iter_parsed(parsed_path):
             if "error" in pf:
                 continue
@@ -199,7 +212,8 @@ class Scanner:
                     entry_kind=c["entry_kind"],
                     is_version_file=pf.get("version_file", False))
                 self.s.add(obj)
-                obj_index[("class", pf["file"], c["start"])] = obj
+                pending_objects.append((("class", pf["file"], c["start"]), obj))
+                class_count += 1
             for m in pf["methods"]:
                 obj = models.CodeObject(
                     scan_id=self.scan.id, module_id=mod.id if mod else None,
@@ -212,11 +226,14 @@ class Scanner:
                     entry_kind=m["entry_kind"],
                     is_version_file=pf.get("version_file", False))
                 self.s.add(obj)
-                obj_index[("method", pf["file"], m["start"])] = obj
-        self.s.flush()
+                pending_objects.append((("method", pf["file"], m["start"]), obj))
+                method_count += 1
+            if len(pending_objects) >= 1000:
+                flush_objects()
+        flush_objects()
 
         # 方法符号索引（跨文件解析）：显式类接收者 + 方法名 + 参数个数
-        method_index: dict[tuple[str, str], list[tuple[int, models.CodeObject]]] = {}
+        method_index: dict[tuple[str, str], list[tuple[int, int]]] = {}
         for pf in self._iter_parsed(parsed_path):
             if "error" in pf:
                 continue
@@ -241,11 +258,13 @@ class Scanner:
                 if from_obj is None:
                     continue  # 无法归属到任何对象，跳过该边
                 self.s.add(models.CallEdge(
-                    scan_id=self.scan.id, from_obj_id=from_obj.id,
-                    to_obj_id=target.id if target else None,
+                    scan_id=self.scan.id, from_obj_id=from_obj,
+                    to_obj_id=target,
                     to_name=call["method"] if target is None else None,
                     resolve_type=rtype, file_path=pf["file"], line=call["line"]))
                 edges += 1
+                if edges % 1000 == 0:
+                    self.s.flush()
 
         # API 端点（类路径 + 方法路径）
         api_count = 0
@@ -277,9 +296,11 @@ class Scanner:
                         self.s.add(models.ApiEndpoint(
                             scan_id=self.scan.id, method=method,
                             path=base + path if base else path,
-                            controller_obj_id=mobj.id,
+                            controller_obj_id=mobj,
                             description=m["comment"]))
                         api_count += 1
+                        if api_count % 1000 == 0:
+                            self.s.flush()
 
         # 表与 SQL 操作
         table_cache: dict[str, models.DataTable] = {}
@@ -308,11 +329,13 @@ class Scanner:
                         self.s.add(models.SqlOperation(
                             scan_id=self.scan.id, table_id=tbl.id, table_name=t,
                             op=_rough_op(st["text"]),
-                            host_obj_id=host.id if host else None,
+                            host_obj_id=host,
                             sql_text=st["text"][:2000],
                             confidence=40 if st.get("template") else 60,
                             file_path=pf["file"], line=st["line"]))
                         sql_ops += 1
+                        if sql_ops % 1000 == 0:
+                            self.s.flush()
                     continue
                 for item in parsed:
                     tbl = table_cache.get(item["table"])
@@ -326,19 +349,19 @@ class Scanner:
                         scan_id=self.scan.id, table_id=tbl.id,
                         table_name=item["table"], op=models.SqlOp(item["op"]),
                         fields=item["fields"],
-                        host_obj_id=host.id if host else None,
+                        host_obj_id=host,
                         sql_text=st["text"][:2000],
                         confidence=90, file_path=pf["file"], line=st["line"]))
                     sql_ops += 1
+                    if sql_ops % 1000 == 0:
+                        self.s.flush()
         self.s.flush()
         self.s.commit()
 
         self.scan.stats = {
             "modules": len(module_cache),
-            "classes": sum(1 for x in obj_index.values()
-                           if x.obj_type != models.ObjType.METHOD),
-            "methods": sum(1 for x in obj_index.values()
-                           if x.obj_type == models.ObjType.METHOD),
+            "classes": class_count,
+            "methods": method_count,
             "call_edges": edges,
             "api_endpoints": api_count,
             "data_tables": len(table_cache),
@@ -436,8 +459,8 @@ def _method_fq_name(package: str, method: dict) -> str | None:
     return f"{head}{method.get('params') or '()'}"
 
 
-def _resolve_call(call: dict, method_index: dict[tuple[str, str], list[tuple[int, models.CodeObject]]]
-                  ) -> tuple[models.CodeObject | None, models.ResolveType]:
+def _resolve_call(call: dict, method_index: dict[tuple[str, str], list[tuple[int, int]]]
+                  ) -> tuple[int | None, models.ResolveType]:
     receiver = call.get("receiver")
     if not receiver or call.get("receiver_kind") != "identifier":
         return None, models.ResolveType.UNKNOWN
