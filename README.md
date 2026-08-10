@@ -1,6 +1,6 @@
 # Code2Business（C2B）—— 从遗留代码还原业务知识
 
-> 当前正式版本：**v0.2.4（待发布）**。
+> 当前正式版本：[**v0.2.4**](https://github.com/imlao17/Code2Business/releases/tag/v0.2.4)。
 > 版本变化见 [CHANGELOG.md](CHANGELOG.md)。本版本定位为“可本地试点、具备工程回归与运行证据第一版”，不等同于多租户商业交付版。
 
 Code2Business 把旧系统代码转换为可追溯、可确认、可交付的业务资产：
@@ -68,6 +68,8 @@ cd web/deploy
 6. 在“文档与验收”页下载正式文档、草稿、Excel 或模块规格 ZIP。
 
 Web 也支持完全离线交付：构建机执行 `./build-dist.sh`，目标机器只需 Docker 即可加载镜像包运行。离线目标机先复制 `.env.example` 为私有 `.env` 并设置密码；如果使用内网模型，需在可信网络中显式设置 `C2B_ALLOW_PRIVATE_LLM=1`。详见 [Web 工作台说明](web/README.md) 与 [离线部署说明](web/deploy/README.md)。
+
+这里的两个分析层次需要区分：**开始扫描**结束后即可看到模块、代码对象、调用关系、数据表和 SQL 等确定性图谱；只有完成下一步的**运行标注**，业务域、业务对象、规则和流程等语义结果才会出现。Web 端没有交互式 Agent 会话，因此“运行标注”需要先配置云端模型 Provider；若不配置模型，也可以只使用扫描图谱和相关导出能力。
 
 ### ② C2B CLI：面向自动化、服务器和批处理
 
