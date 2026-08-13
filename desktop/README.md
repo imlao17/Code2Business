@@ -1,6 +1,6 @@
 # C2B Desktop（macOS 本地工作台）
 
-> 当前开发版本：v0.3.0。C2B Desktop 是 Web 工作台的本地优先分发形态，不是第四套业务引擎。
+> 当前正式版本：[v0.3.0](https://github.com/imlao17/Code2Business/releases/tag/v0.3.0)。C2B Desktop 是 Web 工作台的本地优先分发形态，不是第四套业务引擎。Release 附带的 macOS 包为 Apple Silicon（arm64）未签名试用包；签名、公证与架构边界见下文。
 
 它面向个人架构师、业务分析师和现场交付人员：双击启动后选择本地代码目录，直接完成代码扫描、图谱查看、
 业务标注、人工确认和文档导出。**不需要登录、不需要 Docker、默认不需要 PostgreSQL。**
