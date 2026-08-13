@@ -73,6 +73,35 @@ class HealthCheckTests(DatabaseTestCase):
         self.assertRegex(result["version"], r"^\d+\.\d+\.\d+$")
 
 
+class SqliteConcurrencyTests(DatabaseTestCase):
+    def test_file_database_uses_wal_for_scan_time_reads(self):
+        with self.engine.connect() as connection:
+            mode = connection.exec_driver_sql("PRAGMA journal_mode").scalar_one()
+
+        self.assertEqual(mode.lower(), "wal")
+
+    def test_reader_remains_available_during_uncommitted_graph_write(self):
+        project, scan = self.project_with_scan("concurrent-read")
+        self.s.commit()
+
+        with self.Session() as reader:
+            # Check out the reader connection before the long-lived write,
+            # matching the API pool used by Desktop progress polling.
+            self.assertIsNotNone(reader.get(models.Project, project.id))
+            reader.rollback()
+            self.s.add(models.CodeObject(
+                scan_id=scan.id,
+                obj_type=models.ObjType.CLASS,
+                name="PendingGraphObject",
+                file_path="src/PendingGraphObject.java",
+            ))
+            self.s.flush()
+
+            self.assertIsNotNone(reader.get(models.Project, project.id))
+
+        self.s.rollback()
+
+
 class LatestScanTests(DatabaseTestCase):
     def test_latest_scan_prefers_last_successful_result(self):
         project, good = self.project_with_scan("project")
@@ -527,6 +556,34 @@ class ImportAndScanLifecycleTests(DatabaseTestCase):
         self.assertEqual(flow["steps"][1]["status"], "pending")
         self.assertEqual(flow["next"]["key"], "import")
         self.assertEqual(flow["next"]["status"], "running")
+
+    def test_failed_scan_is_visible_and_retryable_in_pipeline(self):
+        project = models.Project(name="failed-scan", repo_path=self.tmp.name)
+        self.s.add(project)
+        self.s.flush()
+        self.s.add_all([
+            models.Scan(
+                project_id=project.id,
+                status=models.ScanStatus.FAILED,
+                error="(sqlite3.OperationalError) database is locked",
+            ),
+            models.LabelJob(
+                project_id=project.id,
+                status="failed",
+                stage="scan:preparing",
+                error="(sqlite3.OperationalError) database is locked",
+            ),
+        ])
+        self.s.commit()
+
+        flow = pipeline(project.id, self.s)
+
+        scan_step = next(st for st in flow["steps"] if st["key"] == "scan")
+        self.assertEqual(scan_step["status"], "error")
+        self.assertIn("重新扫描", scan_step["error"])
+        self.assertEqual(flow["next"]["key"], "scan")
+        self.assertEqual(flow["next"]["status"], "error")
+        self.assertEqual(flow["next"]["error"], scan_step["error"])
 
 
 class ExportSafetyTests(unittest.TestCase):

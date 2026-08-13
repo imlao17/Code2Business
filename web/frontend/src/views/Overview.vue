@@ -184,21 +184,36 @@ const guideDesc = computed(() => {
     const progress = task.total ? `（${task.progress || 0}/${task.total}）` : ''
     return `${task.label}正在进行：${task.stage || '准备中'}${progress}。页面会自动刷新，完成后展示分析结果。`
   }
+  if (pipelineNext.value?.status === 'error') {
+    return pipelineNext.value.error || `${pipelineNext.value.label}执行失败，请重试。`
+  }
   return guideMap[pipelineNext.value?.key]?.desc || ''
 })
-const guideStatus = computed(() => pipelineNext.value?.status === 'running'
-  ? '任务进行中'
-  : (guideMap[pipelineNext.value?.key]?.status || ''))
-const guideStatusType = computed(() => pipelineNext.value?.status === 'running'
-  ? 'primary'
-  : (guideMap[pipelineNext.value?.key]?.type || 'info'))
-const guideAction = computed(() => pipelineNext.value?.status === 'running'
-  ? ''
-  : (guideMap[pipelineNext.value?.key]?.action || ''))
+const guideStatus = computed(() => {
+  if (pipelineNext.value?.status === 'running') return '任务进行中'
+  if (pipelineNext.value?.status === 'error') return `${pipelineNext.value.label}失败`
+  return guideMap[pipelineNext.value?.key]?.status || ''
+})
+const guideStatusType = computed(() => {
+  if (pipelineNext.value?.status === 'running') return 'primary'
+  if (pipelineNext.value?.status === 'error') return 'danger'
+  return guideMap[pipelineNext.value?.key]?.type || 'info'
+})
+const guideAction = computed(() => {
+  if (pipelineNext.value?.status === 'running') return ''
+  if (pipelineNext.value?.status === 'error') {
+    return pipelineNext.value.key === 'scan' ? '重新扫描' : '重新导入'
+  }
+  return guideMap[pipelineNext.value?.key]?.action || ''
+})
 
 function goGuide() {
   const g = guideMap[pipelineNext.value?.key]
   if (!g) return
+  if (pipelineNext.value?.key === 'scan' && pipelineNext.value?.status === 'error') {
+    emit('start-scan')
+    return
+  }
   if (g.page) {
     router.push(g.page)
   } else if (g.action === '开始扫描') {

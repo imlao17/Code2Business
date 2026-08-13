@@ -1,6 +1,6 @@
 # C2B Desktop（macOS 本地工作台）
 
-> 当前正式版本：[v0.3.0](https://github.com/imlao17/Code2Business/releases/tag/v0.3.0)。C2B Desktop 是 Web 工作台的本地优先分发形态，不是第四套业务引擎。Release 附带的 macOS 包为 Apple Silicon（arm64）未签名试用包；签名、公证与架构边界见下文。
+> 当前正式版本：[v0.3.1](https://github.com/imlao17/Code2Business/releases/tag/v0.3.1)。C2B Desktop 是 Web 工作台的本地优先分发形态，不是第四套业务引擎。Release 附带的 macOS 包为 Apple Silicon（arm64）未签名试用包；签名、公证与架构边界见下文。
 
 它面向个人架构师、业务分析师和现场交付人员：双击启动后选择本地代码目录，直接完成代码扫描、图谱查看、
 业务标注、人工确认和文档导出。**不需要登录、不需要 Docker、默认不需要 PostgreSQL。**
@@ -64,7 +64,7 @@ pnpm build
 
 构建脚本会用 PyInstaller 把 `core/` 打成 `c2b-api` 本地 Sidecar，再由 Tauri 打包为
 `src-tauri/target/release/bundle/macos/C2B Desktop.app`，并生成可复制给测试者的
-`dist/C2B-Desktop-v0.3.0-macos-<架构>.zip`、带 Applications 快捷方式的 `.dmg` 以及两者的
+`dist/C2B-Desktop-v0.3.1-macos-<架构>.zip`、带 Applications 快捷方式的 `.dmg` 以及两者的
 `.sha256`。当前构建机产生的是 `macos-arm64`；Intel Mac
 需要在 Intel macOS 上单独构建，或由后续发布流水线生成签名的 Universal 包。
 

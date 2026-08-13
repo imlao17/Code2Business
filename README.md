@@ -1,7 +1,7 @@
 # Code2Business（C2B）—— 从遗留代码还原业务知识
 
-> 当前正式版本：[**v0.3.0**](https://github.com/imlao17/Code2Business/releases/tag/v0.3.0)，发布日期 2026-08-13。
-> 版本变化见 [CHANGELOG.md](CHANGELOG.md) 和 [v0.3.0 发布说明](docs/releases/v0.3.0.md)。本版本定位为“可本地试点、具备工程回归与运行证据第一版”，不等同于多租户商业交付版。
+> 当前正式版本：[**v0.3.1**](https://github.com/imlao17/Code2Business/releases/tag/v0.3.1)，发布日期 2026-08-13。
+> 版本变化见 [CHANGELOG.md](CHANGELOG.md) 和 [v0.3.1 发布说明](docs/releases/v0.3.1.md)。本版本修复 macOS Desktop 的 SQLite 扫描启动锁与大项目扫描期间的页面可见性，不等同于多租户商业交付版。
 
 Code2Business 把旧系统代码转换为可追溯、可确认、可交付的业务资产：
 

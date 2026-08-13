@@ -1,6 +1,6 @@
 [package]
 name = "c2b-desktop"
-version = "0.3.0"
+version = "0.3.1"
 description = "Code2Business local-first desktop workbench"
 authors = ["Code2Business"]
 edition = "2021"

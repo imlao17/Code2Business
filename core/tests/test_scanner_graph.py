@@ -92,6 +92,67 @@ class Second {
             finally:
                 close_session(session)
 
+    def test_scan_creation_releases_sqlite_lock_before_progress_update(self) -> None:
+        """Desktop progress writes use a second session against the same DB."""
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp) / "source"
+            root.mkdir()
+            (root / "App.java").write_text("class App {}\n", encoding="utf-8")
+            engine = create_engine(
+                f"sqlite:///{Path(tmp) / 'scan.db'}",
+                connect_args={"check_same_thread": False, "timeout": 0.1},
+            )
+            Base.metadata.create_all(engine)
+            Session = sessionmaker(bind=engine, autoflush=False,
+                                   expire_on_commit=False)
+            scan_session = Session()
+            try:
+                project = models.Project(name="desktop", repo_path=str(root))
+                scan_session.add(project)
+                scan_session.commit()
+
+                progress_session = Session()
+                progress_session.add(models.LabelJob(
+                    project_id=project.id,
+                    status="running",
+                    stage="scan:preparing",
+                ))
+                progress_session.commit()
+                job_id = progress_session.execute(
+                    select(models.LabelJob.id)
+                ).scalar_one()
+                progress_session.close()
+
+                stages = []
+
+                def progress(stage, current, total):
+                    with Session() as isolated:
+                        job = isolated.get(models.LabelJob, job_id)
+                        job.stage = f"scan:{stage}"
+                        job.progress = current
+                        job.total = total
+                        isolated.commit()
+                    stages.append(stage)
+
+                result = scan_project(
+                    scan_session,
+                    root,
+                    "desktop",
+                    project_id=project.id,
+                    progress=progress,
+                )
+
+                with Session() as check:
+                    scan = check.get(models.Scan, result["scan_id"])
+                    self.assertEqual(scan.status, models.ScanStatus.DONE)
+                    self.assertTrue(
+                        check.get(models.LabelJob, job_id).stage.startswith("scan:")
+                    )
+                self.assertIn("probe", stages)
+            finally:
+                scan_session.close()
+                engine.dispose()
+
     def test_sharded_parse_filters_non_java_and_marks_task_done(self) -> None:
         java_source = """\
 package demo;

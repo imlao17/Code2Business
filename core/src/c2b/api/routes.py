@@ -596,6 +596,16 @@ def pipeline(pid: int, s: Session = Depends(get_session)):
         j for j in jobs
         if j.status == "failed" and str(j.stage).startswith("import:")
     ), None)
+    failed_scan = next((
+        j for j in jobs
+        if j.status == "failed" and str(j.stage).startswith(("scan", "git"))
+    ), None)
+
+    def task_error(job):
+        error = str(job.error or "任务执行失败").splitlines()[0][:500]
+        if "database is locked" in error.lower():
+            return "本地数据库忙，扫描在启动阶段中断。请重新扫描；若持续发生，请重启桌面端。"
+        return error
 
     completed = [sc for sc in scans if sc.status == models.ScanStatus.DONE]
     scan_id = completed[-1].id if completed else None
@@ -632,7 +642,7 @@ def pipeline(pid: int, s: Session = Depends(get_session)):
                            "total": running_import.total}))
     elif failed_import:
         steps.append(step("import", "导入代码", "/overview", "error",
-                          {"error": failed_import.error}))
+                          {"error": task_error(failed_import)}))
     else:
         steps.append(step("import", "导入代码", "/overview", "done"))
     if not scan_done:
@@ -641,6 +651,9 @@ def pipeline(pid: int, s: Session = Depends(get_session)):
                               {"stage": running_scan.stage,
                                "progress": running_scan.progress,
                                "total": running_scan.total}))
+        elif failed_scan:
+            steps.append(step("scan", "扫描分析", "/overview", "error",
+                              {"error": task_error(failed_scan)}))
         else:
             steps.append(step("scan", "扫描分析", "/overview", "pending"))
     else:
@@ -672,7 +685,7 @@ def pipeline(pid: int, s: Session = Depends(get_session)):
     # 运行中的步骤优先展示，避免把“下一步标注”误显示为可执行。
     next_step = next((st for st in steps if st["status"] == "running"), None)
     if next_step is None:
-        # 导入失败必须先重新导入，避免把空目录误当成可扫描源码。
+        # 失败步骤必须优先展示，避免悄悄退回“待执行”掩盖真实故障。
         next_step = next((st for st in steps if st["status"] == "error"), None)
     if next_step is None:
         # 当前应做步骤（第一个未完成的非导出步骤；全完成则导出）
@@ -681,10 +694,11 @@ def pipeline(pid: int, s: Session = Depends(get_session)):
     if next_step is None and all(st["status"] in ("done", "ready")
                                  for st in steps if st["key"] != "export"):
         next_step = steps[-1]
+    next_fields = ("key", "label", "page", "status", "stage", "progress",
+                   "total", "error")
     return {"project_id": pid, "steps": steps,
-            "next": {"key": next_step["key"], "label": next_step["label"],
-                     "page": next_step["page"],
-                     "status": next_step["status"]} if next_step else None}
+            "next": {key: next_step[key] for key in next_fields
+                     if key in next_step} if next_step else None}
 
 
 @router.get("/projects")

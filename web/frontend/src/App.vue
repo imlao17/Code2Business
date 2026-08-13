@@ -54,7 +54,7 @@
             下一步：{{ pipeline.next.label }}
           </span>
           <span v-else-if="pipeline.next.status === 'error'">
-            代码导入失败，请重新导入
+            {{ pipeline.next.error || `${pipeline.next.label}失败，请重试` }}
           </span>
           <span v-else-if="pipeline.next.status === 'running'">
             正在执行：{{ pipeline.next.label }}
@@ -62,7 +62,9 @@
           <span v-else>流程已完成，可导出交付文档</span>
           <el-button v-if="pipeline.next.status !== 'running'" size="small" type="primary"
                      @click="goStep(pipeline.next)">
-            {{ pipeline.next.status === 'error' ? '重新导入' : '去执行' }}
+            {{ pipeline.next.status === 'error'
+              ? (pipeline.next.key === 'scan' ? '重新扫描' : '重新导入')
+              : '去执行' }}
           </el-button>
         </div>
       </div>
@@ -214,6 +216,7 @@ const stepDesc = st => {
   if (st.count != null) return `${st.count} 项`
   if (st.status === 'done') return '已完成'
   if (st.status === 'ready') return '可执行'
+  if (st.status === 'error') return st.error || '执行失败'
   return ''
 }
 
@@ -224,7 +227,7 @@ async function goStep(st) {
     importOpen.value = true
     return
   }
-  if (st.key === 'scan' && st.status === 'pending') {
+  if (st.key === 'scan' && ['pending', 'error'].includes(st.status)) {
     await startScan()
     return
   }

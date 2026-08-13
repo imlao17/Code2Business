@@ -2,9 +2,9 @@
 
 > 依据：code-to-business-prd.md V1.0
 > 技术决策：Python 全栈 + 可选云 LLM Provider / Agent Native
-> 文档版本：V1.3
+> 文档版本：V1.4
 > 更新日期：2026-08-10
-> 对应产品版本：C2B v0.3.0
+> 对应产品版本：C2B v0.3.1
 
 > **当前实现边界（2026-08-10）**：本文同时保留了目标架构，后续章节中出现 Celery、Redis、
 > Alembic、增量扫描、Vue→API 映射、自动运行证据采集和多节点并行，均为**目标设计而非当前能力**。
@@ -32,6 +32,8 @@
 > 本地目录导入只在 `C2B_DESKTOP_MODE=1` 下开放，删除项目不会删除用户外部源码目录。Desktop 的 LLM Key
 > 存入当前用户 macOS 钥匙串；正式分发流程强制使用 Developer ID Application，完成应用/DMG 公证和
 > Gatekeeper 复核，发布凭据不进入仓库。
+> v0.3.1 修正 Desktop SQLite 并发边界：扫描记录在第一次跨会话进度更新前提交，避免初始化事务持有
+> 单写锁；文件型 SQLite 启用 WAL 与 30 秒 busy timeout，使图谱合并写入期间的流程查询仍可读取。
 
 ---
 

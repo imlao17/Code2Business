@@ -15,13 +15,21 @@ class Base(DeclarativeBase):
 
 def make_engine(url: str | None = None):
     url = url or config.DB_URL
-    kwargs = {"connect_args": {"check_same_thread": False}} if url.startswith("sqlite") else {}
+    kwargs = {
+        "connect_args": {"check_same_thread": False, "timeout": 30}
+    } if url.startswith("sqlite") else {}
     created = create_engine(url, **kwargs)
     if url.startswith("sqlite"):
         @event.listens_for(created, "connect")
-        def _enable_foreign_keys(dbapi_connection, _connection_record):
+        def _configure_sqlite(dbapi_connection, _connection_record):
             cursor = dbapi_connection.cursor()
             cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.execute("PRAGMA busy_timeout=30000")
+            # Desktop scans perform long graph writes while the UI polls from
+            # another connection. WAL keeps those reads available throughout
+            # the merge instead of surfacing transient 500/locked responses.
+            if ":memory:" not in url:
+                cursor.execute("PRAGMA journal_mode=WAL")
             cursor.close()
     return created
 

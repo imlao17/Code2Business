@@ -46,6 +46,10 @@ class Scanner:
                                 git_commit=self.git_commit)
         self.s.add(self.scan)
         self.s.flush()
+        # A scan reports progress through a separate database session.  Keep
+        # the scan row durable and release SQLite's single-writer lock before
+        # the first progress callback attempts to update the background job.
+        self.s.commit()
 
     def fail(self, error: str) -> None:
         self.scan.status = models.ScanStatus.FAILED
