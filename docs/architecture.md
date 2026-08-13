@@ -29,7 +29,9 @@
 > PostgreSQL 完成最小项目的扫描、mock 语义、R1 证据、文档导出和 API 重启持久化验证。
 > v0.3.0 另提供 macOS Desktop：Tauri 壳复用 Vue 工作台并启动同一 Python Core Sidecar，默认使用
 > Application Support 下的 SQLite 和本地数据目录。桌面端通过原生目录选择器关联源码；API 仅绑定 loopback，
-> 本地目录导入只在 `C2B_DESKTOP_MODE=1` 下开放，删除项目不会删除用户外部源码目录。
+> 本地目录导入只在 `C2B_DESKTOP_MODE=1` 下开放，删除项目不会删除用户外部源码目录。Desktop 的 LLM Key
+> 存入当前用户 macOS 钥匙串；正式分发流程强制使用 Developer ID Application，完成应用/DMG 公证和
+> Gatekeeper 复核，发布凭据不进入仓库。
 
 ---
 

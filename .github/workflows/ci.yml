@@ -69,6 +69,15 @@ jobs:
         run: pnpm --dir desktop install --frozen-lockfile
       - name: Compile Desktop shell and Tauri configuration
         run: pnpm --dir desktop check
+      - name: Validate Desktop packaging scripts
+        run: |
+          sh -n desktop/scripts/build-macos.sh
+          sh -n desktop/scripts/release-macos.sh
+          if C2B_MACOS_SIGNING_IDENTITY="Apple Development: CI" \
+            sh desktop/scripts/release-macos.sh; then
+            echo "release script accepted a non-distribution identity" >&2
+            exit 1
+          fi
 
   package-and-docs:
     name: Package and documentation checks

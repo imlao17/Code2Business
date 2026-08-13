@@ -194,6 +194,7 @@ skill/                        # c2b-analyze / scan / semantic / docs 技能组</
       <tr><td>Java 静态扫描、Spring MVC API、MyBatis XML/SQL 图谱</td><td><span class="state done">已实现</span></td><td>通过 tree-sitter、符号索引与 SQL 解析建立事实图谱；RuoYi-Vue 固定提交的 24 个 API/表/SQL 断言已通过；无法唯一解析的调用保守标记。</td></tr>
       <tr><td>Web、CLI、Skills 三种独立入口</td><td><span class="state done">已实现</span></td><td>三者共享 core，但不需要彼此同时部署。</td></tr>
       <tr><td>OpenAI Compatible 与 Anthropic Native</td><td><span class="state done">已实现</span></td><td>两条 HTTP 协议由 <code>LLMClient</code> 显式适配，并保持相同 JSON 校验与安全约束。</td></tr>
+      <tr><td>macOS 本地工具分发</td><td><span class="state done">已实现</span></td><td>Desktop 复用 Web 与 Core，以 loopback Sidecar、SQLite 和原生目录选择器运行；模型 Key 进入 macOS 钥匙串，正式发布流程强制 Developer ID 签名、公证与 Gatekeeper 复核。</td></tr>
       <tr><td>当前 Agent 直接用于首轮语义</td><td><span class="state done">已实现</span></td><td>仅 CLI/Skills 使用 Agent Native 桥接；Web 后台没有当前会话，因此不提供该模式。</td></tr>
       <tr><td>正式文档的确认边界</td><td><span class="state done">已实现</span></td><td>默认只导出确认/修改后的业务知识；草稿模式才包含未确认内容。</td></tr>
       <tr><td>R0-R3 运行证据管理</td><td><span class="state done">已实现</span></td><td>Web/API 可对规则、流程和推演手工录入、查看和纠错删除；导出材料展示运行等级与引用。</td></tr>

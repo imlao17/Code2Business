@@ -136,6 +136,11 @@
           <el-form-item label="API Key">
             <el-input v-model="llmForm.api_key" type="password" show-password
                       :placeholder="llm.has_key ? '已保存：' + llm.key_masked + '（留空则不修改）' : 'sk-...'" />
+            <div v-if="isDesktop" class="form-hint">
+              {{ llm.key_storage === 'macos_keychain'
+                ? '密钥已保存在当前用户的 macOS 钥匙串中。'
+                : '保存后密钥将进入当前用户的 macOS 钥匙串。' }}
+            </div>
           </el-form-item>
           <el-form-item label="模型">
             <el-input v-model="llmForm.model" placeholder="deepseek-chat" />
@@ -176,7 +181,10 @@ const importForm = reactive({
 let zipFile = null
 let importTimer = null
 let importContext = null
-const llm = reactive({ provider: 'openai_compatible', mode: 'api', has_key: false, key_masked: '' })
+const llm = reactive({
+  provider: 'openai_compatible', mode: 'api', has_key: false,
+  key_masked: '', key_storage: 'config_file'
+})
 const llmForm = reactive({ provider: 'openai_compatible', mode: 'api', base_url: '', api_key: '', model: '' })
 const pipeline = ref({ steps: [], next: null })
 const activeStep = ref(0)

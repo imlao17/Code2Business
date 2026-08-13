@@ -1,3 +1,4 @@
+import json
 import unittest
 import tempfile
 from pathlib import Path
@@ -114,6 +115,92 @@ class LlmContractTests(unittest.TestCase):
                 self.assertEqual(settings_store.load_settings()["llm_provider"], "openai_compatible")
                 settings_store.save_settings({"llm_provider": "anthropic"})
                 self.assertEqual(settings_store.load_settings()["llm_provider"], "anthropic")
+
+    def test_desktop_api_key_is_stored_in_macos_keychain(self):
+        from c2b import settings_store
+
+        with tempfile.TemporaryDirectory() as tmp:
+            config_dir = Path(tmp) / "settings"
+            config_file = config_dir / "config.json"
+            with patch.object(settings_store, "CONFIG_DIR", config_dir), \
+                    patch.object(settings_store, "CONFIG_FILE", config_file), \
+                    patch.object(settings_store, "_desktop_keychain_enabled", return_value=True), \
+                    patch.object(settings_store, "_write_keychain_secret") as write_secret, \
+                    patch.object(settings_store, "_read_keychain_secret", return_value="desktop-secret"):
+                saved = settings_store.save_settings({"llm_api_key": "desktop-secret"})
+
+            write_secret.assert_called_once_with("desktop-secret")
+            on_disk = json.loads(config_file.read_text(encoding="utf-8"))
+            self.assertNotIn("llm_api_key", on_disk)
+            self.assertEqual(on_disk["llm_api_key_storage"], "macos_keychain")
+            self.assertEqual(saved["llm_api_key"], "desktop-secret")
+            self.assertEqual(saved["llm_api_key_storage"], "macos_keychain")
+
+    def test_desktop_settings_save_migrates_existing_plaintext_key(self):
+        from c2b import settings_store
+
+        with tempfile.TemporaryDirectory() as tmp:
+            config_dir = Path(tmp) / "settings"
+            config_dir.mkdir()
+            config_file = config_dir / "config.json"
+            config_file.write_text(
+                json.dumps({"llm_api_key": "legacy-secret"}), encoding="utf-8"
+            )
+            with patch.object(settings_store, "CONFIG_DIR", config_dir), \
+                    patch.object(settings_store, "CONFIG_FILE", config_file), \
+                    patch.object(settings_store, "_desktop_keychain_enabled", return_value=True), \
+                    patch.object(settings_store, "_write_keychain_secret") as write_secret, \
+                    patch.object(settings_store, "_read_keychain_secret", return_value="legacy-secret"):
+                settings_store.save_settings({"llm_model": "local-model"})
+
+            write_secret.assert_called_once_with("legacy-secret")
+            on_disk = json.loads(config_file.read_text(encoding="utf-8"))
+            self.assertNotIn("llm_api_key", on_disk)
+            self.assertEqual(on_disk["llm_model"], "local-model")
+
+    def test_keychain_failure_keeps_existing_plaintext_configuration(self):
+        from c2b import settings_store
+
+        with tempfile.TemporaryDirectory() as tmp:
+            config_dir = Path(tmp) / "settings"
+            config_dir.mkdir()
+            config_file = config_dir / "config.json"
+            config_file.write_text(
+                json.dumps({"llm_api_key": "legacy-secret"}), encoding="utf-8"
+            )
+            with patch.object(settings_store, "CONFIG_DIR", config_dir), \
+                    patch.object(settings_store, "CONFIG_FILE", config_file), \
+                    patch.object(settings_store, "_desktop_keychain_enabled", return_value=True), \
+                    patch.object(
+                        settings_store,
+                        "_write_keychain_secret",
+                        side_effect=settings_store.SettingsStoreError("keychain unavailable"),
+                    ):
+                with self.assertRaises(settings_store.SettingsStoreError):
+                    settings_store.save_settings({"llm_model": "local-model"})
+
+            on_disk = json.loads(config_file.read_text(encoding="utf-8"))
+            self.assertEqual(on_disk["llm_api_key"], "legacy-secret")
+            self.assertNotIn("llm_model", on_disk)
+
+    def test_desktop_empty_api_key_removes_keychain_item(self):
+        from c2b import settings_store
+
+        with tempfile.TemporaryDirectory() as tmp:
+            config_dir = Path(tmp) / "settings"
+            config_file = config_dir / "config.json"
+            with patch.object(settings_store, "CONFIG_DIR", config_dir), \
+                    patch.object(settings_store, "CONFIG_FILE", config_file), \
+                    patch.object(settings_store, "_desktop_keychain_enabled", return_value=True), \
+                    patch.object(settings_store, "_delete_keychain_secret") as delete_secret, \
+                    patch.object(settings_store, "_read_keychain_secret", return_value=""):
+                saved = settings_store.save_settings({"llm_api_key": ""})
+
+            delete_secret.assert_called_once_with()
+            self.assertFalse(saved["llm_api_key"])
+            self.assertNotIn(
+                "llm_api_key", json.loads(config_file.read_text(encoding="utf-8"))
+            )
 
 
 if __name__ == "__main__":

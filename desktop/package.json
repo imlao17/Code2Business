@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tauri dev",
     "build": "sh ./scripts/build-macos.sh",
+    "release:macos": "sh ./scripts/release-macos.sh",
     "check": "cargo check --manifest-path src-tauri/Cargo.toml",
     "icon": "tauri icon src-tauri/icons/c2b.svg"
   },

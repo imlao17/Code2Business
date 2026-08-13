@@ -22,7 +22,9 @@
 - 通过“本地代码目录”关联的项目**不会复制源码**，只保存目录引用；删除项目不会删除用户原始代码目录；
 - 内置 API 只监听 `127.0.0.1:8123`，不开放网络端口；
 - Desktop 可连接 `localhost` / 局域网中的 OpenAI Compatible 本地模型（例如 Ollama）；这项放行仅在本地桌面进程中生效，不改变 Web 服务端的 SSRF 防护；
-- 当前 LLM 设置沿用 C2B 本地受限配置文件（权限为仅当前用户）；macOS Keychain 集成计划在后续版本加入，因此不应把多人共用的 macOS 账户当作安全隔离边界。
+- 非敏感 LLM 设置保存在 C2B 应用数据目录；API Key 保存到当前用户的 macOS 钥匙串，不写入 JSON 配置文件。
+  从 v0.3.0 早期本地包升级时，下一次保存 LLM 设置会把已有明文 Key 迁移进钥匙串；仍不应把多人共用的
+  macOS 账户当作安全隔离边界。
 
 ## 开发运行
 
@@ -62,8 +64,24 @@ pnpm build
 
 构建脚本会用 PyInstaller 把 `core/` 打成 `c2b-api` 本地 Sidecar，再由 Tauri 打包为
 `src-tauri/target/release/bundle/macos/C2B Desktop.app`，并生成可复制给测试者的
-`dist/C2B-Desktop-v0.3.0-macos-<架构>.zip` 与 SHA-256。当前构建机产生的是 `macos-arm64`；Intel Mac
+`dist/C2B-Desktop-v0.3.0-macos-<架构>.zip`、带 Applications 快捷方式的 `.dmg` 以及两者的
+`.sha256`。当前构建机产生的是 `macos-arm64`；Intel Mac
 需要在 Intel macOS 上单独构建，或由后续发布流水线生成签名的 Universal 包。
+
+应用图标源文件发生变化时单独执行 `pnpm icon` 并提交生成结果；常规构建不会改写仓库中的图标资产。
+脚本会强制校验 PyInstaller 解析的是当前仓库 `core/src`，避免构建机中曾安装的旧版 wheel 被误打入 Desktop。
+
+`pnpm build` 生成的是本地/内部试用包。面向其他用户正式分发时，必须使用 Developer ID Application 证书和
+Apple 公证：
+
+```bash
+export C2B_MACOS_SIGNING_IDENTITY="Developer ID Application: 组织名称 (TEAMID)"
+export C2B_NOTARY_KEYCHAIN_PROFILE="c2b-notary"
+pnpm release:macos
+```
+
+该命令会生成已签名、公证、通过 Gatekeeper 复核的 ZIP、DMG 及各自 SHA-256；凭据准备和完整发布清单见
+[macOS 发布说明](RELEASING.md)。它会拒绝用 `Apple Development` 证书冒充正式分发签名。
 
 ## 架构与边界
 
@@ -82,5 +100,6 @@ Desktop 与 Web、CLI、Agent Skills 共用扫描、图谱、语义和文档内�
 
 - 当前目标为 macOS；Windows/Linux 打包尚未作为发布承诺；
 - 当前不提供登录、用户角色或项目隔离，适用于单人本机；
-- LLM Key 当前保存为应用数据目录下的受限文件，Keychain 集成未完成；
-- 应用签名、公证、自动更新和跨架构 Universal 包是发布工程的下一步，不影响本地开发与未签名 `.app` 验证。
+- 正式签名、公证与 DMG 流程已经接入，但产出正式包仍要求发布者提供有效的 Developer ID Application 证书和
+  Apple 公证凭据；仓库和本地开发包不携带这些秘密；
+- 自动更新和跨架构 Universal 包尚未实现；当前包名明确包含 `arm64` 或 `x86_64`，避免误导用户。

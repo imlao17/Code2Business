@@ -1908,6 +1908,7 @@ def get_llm_settings():
         "mode": st.get("llm_mode"),
         "has_key": bool(key),
         "key_masked": (key[:6] + "***" + key[-4:]) if len(key) > 12 else "***",
+        "key_storage": st.get("llm_api_key_storage", "config_file"),
     }
 
 
@@ -1933,8 +1934,15 @@ def save_llm_settings(body: LlmSettingsIn):
         overrides["llm_model"] = body.model.strip()
     if body.mode is not None:
         overrides["llm_mode"] = body.mode
-    st = settings_store.save_settings(overrides)
-    return {"ok": True, "has_key": bool(st.get("llm_api_key"))}
+    try:
+        st = settings_store.save_settings(overrides)
+    except settings_store.SettingsStoreError as exc:
+        raise HTTPException(500, str(exc)) from exc
+    return {
+        "ok": True,
+        "has_key": bool(st.get("llm_api_key")),
+        "key_storage": st.get("llm_api_key_storage", "config_file"),
+    }
 
 
 @router.post("/settings/llm/test")

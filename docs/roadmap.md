@@ -7,7 +7,7 @@
 
 > **阅读方式（2026-08-10）**：本 WBS 是目标路线和历史拆分，表中的任务、工期、技术栈及验收标准**不等于已经完成或当前承诺**。当前实现状态以根目录 README、`docs/architecture.md` 与 `docs/quality-baseline.md` 为准。
 
-> **当前证据快照**：已落地 OpenAI Compatible / Anthropic Native 云端 Provider，以及 CLI / Agent Skills 的 Agent Native 证据导出、结构化校验和导入路径；Web 因没有交互式 Agent 会话，仍只使用云端 Provider。RuoYi-Vue 固定提交已完成 Java / Spring MVC / MyBatis XML 的确定性图谱验证（24 项断言通过）和首轮 50 条独立语义抽样（47 正确、3 部分正确），详见 `docs/validation/ruoyi-vue-2026-08.md`。GitHub CI 已覆盖回归、构建和最小 Docker/PostgreSQL 主链路；Web/API 已支持规则、流程和业务推演的 R1-R3 运行证据手工录入与审计。自动 OpenTelemetry/日志采集、Vue→API 映射和 Celery/Redis 仍未完成；多用户权限按本地单团队定位暂缓，不属于 v0.2.x 阻断项。
+> **当前证据快照**：已落地 OpenAI Compatible / Anthropic Native 云端 Provider，以及 CLI / Agent Skills 的 Agent Native 证据导出、结构化校验和导入路径；Web 因没有交互式 Agent 会话，仍只使用云端 Provider。RuoYi-Vue 固定提交已完成 Java / Spring MVC / MyBatis XML 的确定性图谱验证（24 项断言通过）和首轮 50 条独立语义抽样（47 正确、3 部分正确），详见 `docs/validation/ruoyi-vue-2026-08.md`。GitHub CI 已覆盖回归、构建和最小 Docker/PostgreSQL 主链路；Web/API 已支持规则、流程和业务推演的 R1-R3 运行证据手工录入与审计。v0.3.0 增加 macOS 本地工作台，已验证 Tauri + Python Sidecar 的真实 arm64 应用构建与退出生命周期；模型 Key 使用 macOS 钥匙串，Developer ID 签名、公证、DMG 和 Gatekeeper 发布流程已接入，正式产物仍取决于发布者凭据。自动更新、Universal 包、OpenTelemetry/日志采集、Vue→API 映射和 Celery/Redis 仍未完成；多用户权限按本地单团队定位暂缓，不属于当前本地工具阻断项。
 
 ---
 

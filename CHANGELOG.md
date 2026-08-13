@@ -19,6 +19,12 @@ Core，不引入第二套扫描、图谱或语义实现。
   本地模型地址放行只影响 loopback Sidecar，不改变 Web 服务的私网 LLM 防护。
 - 增加 macOS 打包脚本：PyInstaller 将同一 `core/` 打为 `c2b-api` Sidecar，Tauri 打包为
   `C2B Desktop.app`；并提供开发、构建、数据与隐私边界文档。
+- Desktop 的 LLM API Key 改存当前用户的 macOS 钥匙串；升级用户下一次保存模型设置时会迁移早期配置文件中的
+  明文 Key，普通 Web/CLI 的配置优先级保持不变。
+- 增加正式 macOS 发布脚本与清单：只接受 Developer ID Application 身份，完成应用和 DMG 的签名、公证、
+  Gatekeeper 复核及 SHA-256 生成；本地试用构建仍无需 Apple 凭据。
+- 本地试用构建除 ZIP 外同步生成包含 Applications 快捷方式的 DMG，并对两个产物分别输出 SHA-256 文件；
+  版本号从 Desktop 清单读取，不再在脚本中重复硬编码。
 
 ### 验证
 
@@ -28,8 +34,8 @@ Core，不引入第二套扫描、图谱或语义实现。
 
 ### 已知边界
 
-- 当前交付的是 macOS 本地单用户版本；Apple Developer 签名、公证、自动更新、Universal 双架构包与
-  Keychain 保存模型 Key 尚未完成。未签名 `.app` 首次打开可能需要用户在 macOS 安全设置中确认。
+- 当前交付的是 macOS 本地单用户版本；正式签名与公证流程已经就绪，但仓库不包含发布者的 Developer ID 和
+  Apple 公证凭据。自动更新与 Universal 双架构包尚未完成；未签名本地 `.app` 首次打开可能仍需在安全设置中确认。
 
 ## v0.2.4 — 2026-08-10
 
