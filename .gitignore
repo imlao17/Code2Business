@@ -32,6 +32,12 @@ web/deploy/dist/
 web/deploy/frontend-dist/
 web/deploy/*.tar.gz
 
+# --- macOS Desktop build products ---
+desktop/node_modules/
+desktop/src-tauri/target/
+desktop/src-tauri/gen/
+desktop/dist/
+
 # --- 系统/IDE ---
 .DS_Store
 .idea/

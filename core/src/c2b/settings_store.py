@@ -1,14 +1,18 @@
-"""LLM 配置持久化：~/.c2b/config.json（chmod 600）。
+"""LLM 配置持久化：默认 ``~/.c2b/config.json``（chmod 600）。
 
 优先级：环境变量 C2B_LLM_* > ~/.c2b/config.json > 默认值。
 Web 设置界面通过此文件保存配置，进程内即时生效（LLMClient 每次初始化读取）。
+
+Desktop may set ``C2B_CONFIG_DIR`` to its Application Support directory so a
+local workbench neither leaks settings into the CLI profile nor needs a
+global writable location.
 """
 import json
 import os
 import threading
 from pathlib import Path
 
-CONFIG_DIR = Path.home() / ".c2b"
+CONFIG_DIR = Path(os.environ.get("C2B_CONFIG_DIR", Path.home() / ".c2b"))
 CONFIG_FILE = CONFIG_DIR / "config.json"
 _WRITE_LOCK = threading.Lock()
 

@@ -4,7 +4,7 @@
 > 技术决策：Python 全栈 + 可选云 LLM Provider / Agent Native
 > 文档版本：V1.3
 > 更新日期：2026-08-10
-> 对应产品版本：C2B v0.2.4
+> 对应产品版本：C2B v0.3.0
 
 > **当前实现边界（2026-08-10）**：本文同时保留了目标架构，后续章节中出现 Celery、Redis、
 > Alembic、增量扫描、Vue→API 映射、自动运行证据采集和多节点并行，均为**目标设计而非当前能力**。
@@ -27,6 +27,9 @@
 > 完成后也待扫描；扫描只能由用户显式启动。该版本同时保留 v0.2.2 的 ZIP 路径、符号链接、成员数量和解压量安全边界，并以大文件与整体压缩率识别异常
 > 压缩包；高重复的小型遗留文本不会单独触发 zip bomb 拒绝。GitHub CI 会复跑 Python、前端、wheel/文档检查，并以真实 Docker Compose +
 > PostgreSQL 完成最小项目的扫描、mock 语义、R1 证据、文档导出和 API 重启持久化验证。
+> v0.3.0 另提供 macOS Desktop：Tauri 壳复用 Vue 工作台并启动同一 Python Core Sidecar，默认使用
+> Application Support 下的 SQLite 和本地数据目录。桌面端通过原生目录选择器关联源码；API 仅绑定 loopback，
+> 本地目录导入只在 `C2B_DESKTOP_MODE=1` 下开放，删除项目不会删除用户外部源码目录。
 
 ---
 
@@ -466,6 +469,7 @@ L3 边缘按需    长尾逻辑（低热度工具方法、罕见分支）按需�
 |---|---|
 | 开发期 | docker compose：PG + Redis + 后端 + 前端 + worker（扫描器本地 CLI 运行） |
 | 交付期（默认） | 客户内网私有化：docker compose 单机（≤100 万行）或加 worker 节点（100 万+，扫描机 64GB 级） |
+| macOS 本地工作台（当前） | Tauri 2 + Vue + Python Sidecar；双击启动，SQLite 存于 Application Support，API 仅监听 `127.0.0.1`；直接关联本地源码目录，不需要 Docker 或登录 |
 | 安全底线 | 源码不出内网；仅上传结构化图谱；支持敏感字段脱敏（表名/字段名映射）；图谱加密存储；不用客户代码训练公共模型 |
 
 ---

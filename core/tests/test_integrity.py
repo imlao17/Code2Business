@@ -20,6 +20,7 @@ from c2b.api.main import healthz
 from c2b.api.routes import (
     BatchConfirmIn,
     ConfirmIn,
+    LocalProjectImportIn,
     RuntimeEvidenceIn,
     _create_project_job,
     _excel_safe,
@@ -30,6 +31,7 @@ from c2b.api.routes import (
     confirm_rules_batch,
     delete_project,
     import_project,
+    import_local_project,
     pipeline,
     runtime_evidence_create,
     runtime_evidence_delete,
@@ -425,6 +427,35 @@ class BackgroundJobExclusionTests(DatabaseTestCase):
 
 
 class ImportAndScanLifecycleTests(DatabaseTestCase):
+    def test_local_directory_import_requires_desktop_mode(self):
+        source = Path(self.tmp.name) / "legacy"
+        source.mkdir()
+        (source / "App.java").write_text("class App {}\n", encoding="utf-8")
+
+        with self.assertRaises(HTTPException) as ctx:
+            import_local_project(
+                LocalProjectImportIn(name="local", source_path=str(source)), self.s
+            )
+        self.assertEqual(ctx.exception.status_code, 404)
+
+    def test_desktop_local_directory_import_keeps_source_in_place(self):
+        source = Path(self.tmp.name) / "legacy"
+        source.mkdir()
+        source_file = source / "App.java"
+        source_file.write_text("class App {}\n", encoding="utf-8")
+
+        with patch.dict(os.environ, {"C2B_DESKTOP_MODE": "1"}, clear=False):
+            result = import_local_project(
+                LocalProjectImportIn(name="local", source_path=str(source)), self.s
+            )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["import_status"], "ready")
+        self.assertEqual(result["source"], "local")
+        project = self.s.get(models.Project, result["project_id"])
+        self.assertEqual(Path(project.repo_path), source.resolve())
+        self.assertTrue(source_file.is_file())
+
     def test_zip_import_only_creates_a_project_and_leaves_scan_pending(self):
         archive = io.BytesIO()
         with zipfile.ZipFile(archive, "w") as zf:

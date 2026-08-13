@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -24,6 +25,24 @@ async def _lifespan(_app: FastAPI):
 
 
 app = FastAPI(title="Code2Business API", version=__version__, lifespan=_lifespan)
+if os.environ.get("C2B_DESKTOP_MODE", "").strip().lower() in {"1", "true", "yes", "on"}:
+    # The Desktop WebView is a different origin from the loopback API.  Keep
+    # this exception local to the packaged app instead of relaxing CORS for
+    # normal browser/server deployments.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            "tauri://localhost",
+            "http://tauri.localhost",
+            # Tauri development serves the same desktop WebView from Vite.
+            # These loopback-only origins are not enabled in Web/API mode.
+            "http://127.0.0.1:5173",
+            "http://localhost:5173",
+        ],
+        allow_credentials=False,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 app.include_router(router)
 
 

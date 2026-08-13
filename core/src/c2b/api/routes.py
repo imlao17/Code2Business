@@ -91,6 +91,19 @@ class RuntimeEvidenceIn(BaseModel):
     created_by: str | None = Field(default=None, max_length=100)
 
 
+class LocalProjectImportIn(BaseModel):
+    """Desktop-only request to register a user-selected local repository.
+
+    The Web product deliberately accepts only uploaded archives or validated
+    Git URLs.  A desktop app, however, has an explicit native file-picker
+    consent boundary, so it can analyse a directory in place without copying
+    a potentially multi-gigabyte repository first.
+    """
+
+    name: str = Field(min_length=1, max_length=200)
+    source_path: str = Field(min_length=1, max_length=4096)
+
+
 def _latest_scan(
     s: Session, project_id: int, *, completed_only: bool = True
 ) -> models.Scan:
@@ -397,6 +410,48 @@ async def import_project(name: str = Form(...),
         "job_id": None,
         "import_status": "ready",
         "message": "代码导入完成，可以开始扫描",
+    }
+
+
+@router.post("/projects/import-local")
+def import_local_project(body: LocalProjectImportIn, s: Session = Depends(get_session)):
+    """Register a local source directory selected by C2B Desktop.
+
+    This endpoint is intentionally unavailable in ordinary Web/API mode.
+    Desktop launches its API on the loopback interface and sets
+    ``C2B_DESKTOP_MODE=1`` after the native macOS directory picker grants
+    access.  The project keeps a resolved external path, and the existing
+    delete endpoint therefore preserves the user's original repository.
+    """
+    from pathlib import Path
+
+    if not _env_flag("C2B_DESKTOP_MODE"):
+        raise HTTPException(404, "本地目录导入仅在 C2B Desktop 中可用")
+
+    root = Path(body.source_path).expanduser()
+    try:
+        root = root.resolve(strict=True)
+    except OSError as exc:
+        raise HTTPException(400, "所选代码目录不存在或无法访问") from exc
+    if not root.is_dir():
+        raise HTTPException(400, "请选择包含源码的目录，而不是单个文件")
+    try:
+        has_entries = any(root.iterdir())
+    except OSError as exc:
+        raise HTTPException(400, "无法读取所选代码目录") from exc
+    if not has_entries:
+        raise HTTPException(400, "所选代码目录为空")
+
+    project = models.Project(name=body.name.strip(), repo_path=str(root))
+    s.add(project)
+    s.commit()
+    return {
+        "ok": True,
+        "project_id": project.id,
+        "job_id": None,
+        "import_status": "ready",
+        "source": "local",
+        "message": "本地代码目录已关联，可以开始扫描",
     }
 
 

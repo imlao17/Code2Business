@@ -17,9 +17,10 @@ import httpx
 
 from .security import UnsafeUrlError, validate_outbound_url
 
-# LLM 结果缓存：统一放 ~/.c2b/llm_cache（不依赖 DB URL——之前按 DB URL 拼路径
-# 对 PostgreSQL URL 会生成非法目录，导致缓存写入失败）
-_CACHE_DIR = Path.home() / ".c2b" / "llm_cache"
+# LLM 结果缓存默认放 ~/.c2b/llm_cache（不依赖 DB URL——之前按 DB URL 拼路径
+# 对 PostgreSQL URL 会生成非法目录，导致缓存写入失败）。Desktop sets
+# C2B_CONFIG_DIR to keep its local workbench data self-contained.
+_CACHE_DIR = Path(os.environ.get("C2B_CONFIG_DIR", Path.home() / ".c2b")) / "llm_cache"
 try:
     _CACHE_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
     os.chmod(_CACHE_DIR, 0o700)

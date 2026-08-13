@@ -1,7 +1,10 @@
 <template>
-  <el-container class="layout">
+  <el-container :class="['layout', { 'desktop-shell': isDesktop }]">
     <el-aside width="220px" class="aside">
-      <div class="logo">Code2Business</div>
+      <div class="logo">
+        <span class="logo-mark">⌁</span>
+        <span>Code2Business<small v-if="isDesktop">Desktop</small></span>
+      </div>
       <el-menu :default-active="$route.path" router class="menu">
         <el-menu-item index="/overview">项目总览</el-menu-item>
         <el-menu-item index="/module-specs">模块需求规格</el-menu-item>
@@ -17,6 +20,7 @@
       <el-header class="header">
         <div class="title">{{ $route.meta.title }}</div>
         <div class="header-right">
+          <span v-if="isDesktop" class="local-only">本地工作台 · 数据仅保存在此 Mac</span>
           <el-button size="small" type="primary" :loading="labeling"
                      :disabled="!pid" @click="runLabel">运行标注</el-button>
           <el-button size="small" type="success" @click="importOpen = true">新建项目</el-button>
@@ -75,11 +79,18 @@
           </el-form-item>
           <el-form-item label="代码来源">
             <el-radio-group v-model="importForm.source">
+              <el-radio v-if="isDesktop" value="local">本地代码目录</el-radio>
               <el-radio value="zip">上传 Zip 包</el-radio>
               <el-radio value="git">Git 地址</el-radio>
             </el-radio-group>
           </el-form-item>
-          <el-form-item v-if="importForm.source === 'zip'" label="Zip 文件" required>
+          <el-form-item v-if="importForm.source === 'local'" label="代码目录" required>
+            <el-input v-model="importForm.localPath" readonly placeholder="选择本机代码目录">
+              <template #append><el-button @click="chooseLocalDirectory">选择目录…</el-button></template>
+            </el-input>
+            <div class="form-hint">仅关联此目录，不会复制或删除你的原始代码。</div>
+          </el-form-item>
+          <el-form-item v-else-if="importForm.source === 'zip'" label="Zip 文件" required>
             <el-upload :auto-upload="false" :limit="1" drag
                        accept=".zip" :on-change="onZipChange">
               <div class="upload-tip">拖拽 zip 代码包到此处，或点击选择</div>
@@ -97,7 +108,9 @@
         </el-form>
         <template #footer>
           <el-button @click="importOpen = false">取消</el-button>
-          <el-button type="primary" :loading="importing" @click="doImport">导入代码</el-button>
+          <el-button type="primary" :loading="importing" @click="doImport">
+            {{ importForm.source === 'local' ? '关联本地目录' : '导入代码' }}
+          </el-button>
         </template>
       </el-dialog>
 
@@ -142,6 +155,7 @@ import { ref, reactive, onMounted, onUnmounted, watch, computed, defineAsyncComp
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import api, { LONG_REQUEST_TIMEOUT } from './api'
+import { chooseLocalSourceDirectory, isDesktop } from './desktop'
 const QaFloat = defineAsyncComponent(() => import('./components/QaFloat.vue'))
 
 const routerPush = useRouter().push
@@ -156,7 +170,9 @@ const importing = ref(false)
 const importPercent = ref(0)
 const importStatus = ref('')
 const importStage = ref('')
-const importForm = reactive({ name: '', source: 'zip', gitUrl: '' })
+const importForm = reactive({
+  name: '', source: isDesktop ? 'local' : 'zip', gitUrl: '', localPath: ''
+})
 let zipFile = null
 let importTimer = null
 let importContext = null
@@ -288,6 +304,17 @@ function onZipChange(file) {
   zipFile = file.raw
 }
 
+async function chooseLocalDirectory() {
+  try {
+    const selected = await chooseLocalSourceDirectory()
+    if (!selected) return
+    importForm.localPath = selected.path
+    if (!importForm.name.trim()) importForm.name = selected.name
+  } catch (error) {
+    ElMessage.error(error?.message || '无法打开本地目录选择器')
+  }
+}
+
 async function finishImport(projectId, originPid) {
   stopImportPoll()
   importing.value = false
@@ -311,6 +338,10 @@ async function doImport() {
     ElMessage.warning('请选择 zip 文件')
     return
   }
+  if (importForm.source === 'local' && !importForm.localPath) {
+    ElMessage.warning('请选择本地代码目录')
+    return
+  }
   if (importForm.source === 'git' && !importForm.gitUrl.trim()) {
     ElMessage.warning('请输入 Git 地址')
     return
@@ -320,17 +351,24 @@ async function doImport() {
   importing.value = true
   importPercent.value = 2
   importStatus.value = ''
-  importStage.value = '上传/导入代码...'
-  const fd = new FormData()
-  fd.append('name', importForm.name.trim())
-  if (importForm.source === 'zip') {
-    fd.append('file', zipFile)
-  } else {
-    fd.append('git_url', importForm.gitUrl.trim())
-  }
+  importStage.value = importForm.source === 'local' ? '正在关联本地代码目录...' : '上传/导入代码...'
   try {
-    // ZIP 解压在请求中完成；Git 克隆由导入任务异步执行。
-    const r = (await api.post('/projects/import', fd, { timeout: 600000 })).data
+    let r
+    if (importForm.source === 'local') {
+      r = (await api.post('/projects/import-local', {
+        name: importForm.name.trim(), source_path: importForm.localPath
+      })).data
+    } else {
+      const fd = new FormData()
+      fd.append('name', importForm.name.trim())
+      if (importForm.source === 'zip') {
+        fd.append('file', zipFile)
+      } else {
+        fd.append('git_url', importForm.gitUrl.trim())
+      }
+      // ZIP 解压在请求中完成；Git 克隆由导入任务异步执行。
+      r = (await api.post('/projects/import', fd, { timeout: 600000 })).data
+    }
     if (r.error) {
       ElMessage.error(r.error)
       importing.value = false
@@ -518,7 +556,9 @@ onUnmounted(() => {
 html, body, #app { height: 100%; margin: 0; }
 .layout { height: 100%; }
 .aside { background: #1f2937; }
-.logo { color: #fff; font-weight: 700; font-size: 17px; padding: 18px 20px; letter-spacing: 1px; }
+.logo { color: #fff; font-weight: 700; font-size: 17px; padding: 18px 20px; letter-spacing: .2px; display: flex; gap: 9px; align-items: center; }
+.logo small { display: block; font-size: 10px; font-weight: 500; color: #94a3b8; letter-spacing: .4px; margin-top: 2px; }
+.logo-mark { color: #67d4bd; font-size: 28px; line-height: 16px; font-weight: 400; }
 .menu { border-right: none; background: transparent; }
 .menu .el-menu-item { color: #cbd5e1; }
 .menu .el-menu-item.is-active { color: #fff; background: #374151; }
@@ -526,6 +566,7 @@ html, body, #app { height: 100%; margin: 0; }
           border-bottom: 1px solid #e5e7eb; background: #fff; }
 .header-right { display: flex; align-items: center; gap: 8px; }
 .title { font-size: 16px; font-weight: 600; }
+.local-only { color: #64748b; font-size: 12px; margin-right: 4px; }
 .pipeline-bar { background: #fff; border-bottom: 1px solid #e5e7eb;
                 padding: 8px 20px 10px; }
 .pipeline-steps { max-width: 900px; margin: 0 auto; }
@@ -534,4 +575,14 @@ html, body, #app { height: 100%; margin: 0; }
                  gap: 10px; justify-content: center; align-items: center;
                  color: #6b7280; font-size: 13px; }
 .main { background: #f3f4f6; overflow: auto; }
+.desktop-shell .aside { background: #17212d; }
+.desktop-shell .menu .el-menu-item { margin: 3px 8px; border-radius: 7px; height: 38px; line-height: 38px; }
+.desktop-shell .menu .el-menu-item.is-active { background: #314158; }
+.desktop-shell .header { min-height: 54px; background: rgba(255, 255, 255, .94); }
+.desktop-shell .main { background: #f6f7f9; }
+@media (prefers-color-scheme: dark) {
+  .desktop-shell .header, .desktop-shell .pipeline-bar { background: #202a36; border-color: #334155; color: #e2e8f0; }
+  .desktop-shell .main { background: #18212c; }
+  .desktop-shell .title { color: #f1f5f9; }
+}
 </style>

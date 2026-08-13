@@ -50,6 +50,26 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
 
+  desktop-shell:
+    name: macOS Desktop shell check
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10
+          run_install: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: desktop/pnpm-lock.yaml
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install desktop shell dependencies
+        run: pnpm --dir desktop install --frozen-lockfile
+      - name: Compile Desktop shell and Tauri configuration
+        run: pnpm --dir desktop check
+
   package-and-docs:
     name: Package and documentation checks
     runs-on: ubuntu-latest

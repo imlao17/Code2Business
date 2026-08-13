@@ -1,0 +1,42 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "C2B Desktop",
+  "version": "0.3.0",
+  "identifier": "com.lao17.code2business",
+  "build": {
+    "beforeDevCommand": "pnpm --dir ../web/frontend dev --host 127.0.0.1",
+    "beforeBuildCommand": "pnpm --dir ../web/frontend build",
+    "devUrl": "http://127.0.0.1:5173",
+    "frontendDist": "../../web/frontend/dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "C2B Desktop",
+        "width": 1360,
+        "height": 900,
+        "minWidth": 1080,
+        "minHeight": 720,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' http://127.0.0.1:8123; img-src 'self' asset: http://asset.localhost data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "icon": ["icons/icon.icns", "icons/icon.png"],
+    "category": "DeveloperTool",
+    "shortDescription": "从遗留代码还原业务知识",
+    "longDescription": "C2B Desktop 是本地优先的遗留系统业务知识还原工作台。",
+    "macOS": {
+      "minimumSystemVersion": "11.0"
+    },
+    "resources": {
+      "../runtime/c2b-api": "c2b-api"
+    }
+  }
+}

@@ -1,6 +1,6 @@
 # Code2Business（C2B）—— 从遗留代码还原业务知识
 
-> 当前正式版本：[**v0.2.4**](https://github.com/imlao17/Code2Business/releases/tag/v0.2.4)。
+> 当前开发版本：**v0.3.0（未发布）**；最近正式版本：[v0.2.4](https://github.com/imlao17/Code2Business/releases/tag/v0.2.4)。
 > 版本变化见 [CHANGELOG.md](CHANGELOG.md)。本版本定位为“可本地试点、具备工程回归与运行证据第一版”，不等同于多租户商业交付版。
 
 Code2Business 把旧系统代码转换为可追溯、可确认、可交付的业务资产：
@@ -30,16 +30,17 @@ Code2Business 把旧系统代码转换为可追溯、可确认、可交付的业
 
 | 产品 | 适合谁 | 解决的问题 | 独立运行条件 | 入口 |
 |---|---|---|---|---|
-| **① C2B Web 工作台** | 产品经理、业务分析师、测试、交付顾问 | 可视化图谱、人工确认、R0-R3 运行证据管理、单团队评审与导出 | Docker；离线目标机只需 Docker | [web/README.md](web/README.md) |
+| **① C2B 工作台** | 产品经理、业务分析师、测试、交付顾问 | 可视化图谱、人工确认、R0-R3 运行证据管理、单团队评审与导出 | 浏览器版用 Docker；macOS 本地版不需要 Docker | [Web 工作台](web/README.md) / [macOS Desktop](desktop/README.md) |
 | **② C2B CLI** | 开发、架构、运维、CI/批处理使用者 | 在服务器或脚本中批量扫描、生成规格、导出文档、接入自动化 | Python 3.11+；可选 PostgreSQL；语义可选外部 LLM 或 Agent Native 导入 | [cli/README.md](cli/README.md) |
 | **③ C2B Agent Skills** | 使用 Claude Code、Codex、opencode 等 Agent 的团队 | 用自然语言编排扫描、语义分析和文档交付，保留每阶段过程与证据 | Python 3.11+、pip、兼容的 Agent 宿主 | [skill/README.md](skill/README.md) |
 
-`core/` 是三种产品共用的实现和运行时，不是第四个面向用户的部署产品。Web 镜像、CLI wheel 和 Agent Skill 都会携带或安装它。
+`core/` 是三种产品共用的实现和运行时，不是第四个面向用户的部署产品。Web 镜像、CLI wheel、Agent Skill 与 macOS Desktop 都会携带或安装它。macOS Desktop 是产品①的本地优先分发形态，不是一套重复的业务内核。
 
 ### 如何选择
 
 ```text
 需要业务人员在浏览器里看图谱、确认规则、下载文档？ → 选 Web 工作台
+希望在 Mac 上双击即用、直接选择本地代码目录？      → 选 C2B Desktop
 需要在服务器、终端、CI 或脚本中稳定批处理？       → 选 CLI
 希望直接对 AI Agent 说“分析这个仓库并交付文档”？     → 选 Agent Skills
 ```
@@ -70,6 +71,13 @@ cd web/deploy
 Web 也支持完全离线交付：构建机执行 `./build-dist.sh`，目标机器只需 Docker 即可加载镜像包运行。离线目标机先复制 `.env.example` 为私有 `.env` 并设置密码；如果使用内网模型，需在可信网络中显式设置 `C2B_ALLOW_PRIVATE_LLM=1`。详见 [Web 工作台说明](web/README.md) 与 [离线部署说明](web/deploy/README.md)。
 
 这里的两个分析层次需要区分：**开始扫描**结束后即可看到模块、代码对象、调用关系、数据表和 SQL 等确定性图谱；只有完成下一步的**运行标注**，业务域、业务对象、规则和流程等语义结果才会出现。Web 端没有交互式 Agent 会话，因此“运行标注”需要先配置云端模型 Provider；若不配置模型，也可以只使用扫描图谱和相关导出能力。
+
+### ①a C2B Desktop（macOS）：面向本地、离线与即开即用
+
+**适用场景**：不希望安装 Docker，也不想先部署服务器；在个人 Mac、客户现场或内网笔记本上直接选择一个源码目录开始业务还原。
+
+Desktop 使用与 Web 工作台相同的 Vue 界面和 Python Core，但在本机以 `.app` 运行：默认 SQLite、本地目录选择器、
+本地任务进程和 `127.0.0.1` API，不提供登录也不会开放网络端口。通过“本地代码目录”导入时只关联原目录，不复制或删除原始代码。构建、安装、数据位置、隐私边界和当前限制见 [C2B Desktop（macOS）说明](desktop/README.md)。
 
 ### ② C2B CLI：面向自动化、服务器和批处理
 

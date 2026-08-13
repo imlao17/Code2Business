@@ -1,0 +1,15 @@
+[package]
+name = "c2b-desktop"
+version = "0.3.0"
+description = "Code2Business local-first desktop workbench"
+authors = ["Code2Business"]
+edition = "2021"
+rust-version = "1.77.2"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+rfd = "0.15"
+serde = { version = "1", features = ["derive"] }
+tauri = { version = "2", features = [] }

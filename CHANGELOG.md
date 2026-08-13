@@ -1,7 +1,35 @@
 # Code2Business 变更日志
 
 本项目采用[语义化版本](https://semver.org/lang/zh-CN/)记录可分发产品版本。Web、CLI、Agent Skills
-共享同一个 `core` 引擎，并在同一次发布中使用相同版本号；三者仍可分别独立部署。
+（含 macOS Desktop 分发）、CLI、Agent Skills 共享同一个 `core` 引擎，并在同一次发布中使用相同版本号；
+三者仍可分别独立部署。
+
+## v0.3.0 — 2026-08-13
+
+版本定位：macOS 本地优先工作台首版。它是产品① Web 工作台的桌面分发形态，复用同一 Vue 界面与 Python
+Core，不引入第二套扫描、图谱或语义实现。
+
+### 新增
+
+- 增加 `desktop/`：Tauri 2 macOS 桌面壳、本地 Python/FastAPI Sidecar、原生代码目录选择器和 macOS
+  应用图标；启动时自动准备本地 SQLite、项目数据目录和设置目录，不需要 Docker、PostgreSQL 或登录。
+- Desktop API 只绑定 `127.0.0.1:8123`；仅在 `C2B_DESKTOP_MODE=1` 时允许由原生目录选择器驱动的
+  `POST /api/projects/import-local`。现有 Web 仍只支持 ZIP 或经 SSRF 校验的 Git 导入。
+- 本地目录导入只保存已解析的目录引用，不复制百万行级源码；删除项目继续保留外部代码目录。Desktop 的
+  本地模型地址放行只影响 loopback Sidecar，不改变 Web 服务的私网 LLM 防护。
+- 增加 macOS 打包脚本：PyInstaller 将同一 `core/` 打为 `c2b-api` Sidecar，Tauri 打包为
+  `C2B Desktop.app`；并提供开发、构建、数据与隐私边界文档。
+
+### 验证
+
+- 新增 Desktop 本地目录导入的“非 Desktop 拒绝 / Desktop 成功且外部源码保留”后端回归。
+- 本机已完成 Tauri 壳编译、Vue 生产构建和真实桌面启动：应用自动拉起 Python API，健康检查、Vite
+  开发跨域、目录关联以及删除项目保留源目录均通过。
+
+### 已知边界
+
+- 当前交付的是 macOS 本地单用户版本；Apple Developer 签名、公证、自动更新、Universal 双架构包与
+  Keychain 保存模型 Key 尚未完成。未签名 `.app` 首次打开可能需要用户在 macOS 安全设置中确认。
 
 ## v0.2.4 — 2026-08-10
 
