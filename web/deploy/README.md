@@ -1,6 +1,6 @@
 # Code2Business 网页端部署（形态①）
 
-> 当前正式版本：[v0.3.0](https://github.com/imlao17/Code2Business/releases/tag/v0.3.0)。版本变化见[仓库变更日志](../../CHANGELOG.md)。
+> 当前正式版本：[v0.3.1](https://github.com/imlao17/Code2Business/releases/tag/v0.3.1)。版本变化见[仓库变更日志](../../CHANGELOG.md)。
 
 一键启动：PG + API + 前端（nginx），浏览器打开 http://localhost:8080。
 默认只监听 `127.0.0.1`，不会直接暴露到局域网或公网。
