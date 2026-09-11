@@ -74,6 +74,17 @@ pnpm build
 `pnpm build` 生成的是本地/内部试用包。面向其他用户正式分发时，必须使用 Developer ID Application 证书和
 Apple 公证：
 
+#### 试用包首次打开（macOS Sequoia 及以上必读）
+
+未签名试用包从浏览器下载后，macOS 13+ 可能提示"已损坏，无法打开"。**App 并未损坏**，
+这是 Gatekeeper 对无公证包的隔离拦截；Sequoia 已不提供"右键打开"绕过，请点「取消」后执行：
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/C2B Desktop.app"
+# 若 dmg 文件本身也被拦截，对它执行同样命令后再打开
+xattr -d com.apple.quarantine ~/Downloads/C2B-Desktop-v0.5.0-macos-arm64.dmg
+```
+
 ```bash
 export C2B_MACOS_SIGNING_IDENTITY="Developer ID Application: 组织名称 (TEAMID)"
 export C2B_NOTARY_KEYCHAIN_PROFILE="c2b-notary"
