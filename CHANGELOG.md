@@ -4,6 +4,31 @@
 （Web 工作台含 macOS Desktop 分发）、CLI、Agent Skills 共享同一个 `core` 引擎，并在同一次发布中使用相同版本号；
 三者仍可分别独立部署。
 
+## v0.5.0 — 2026-09-11
+
+发布状态：MCP 接入版（功能版本）。
+
+版本定位：把 Code2Business 变成 AI 客户端的"原生工具"——任何支持 MCP 的 AI
+（ZCode、Claude Desktop、Codex 等）现在可以直接调用扫描、语义标注与交付文档，
+不再需要人肉搬运 CLI 输出。
+
+### 新增
+
+- **`c2b mcp` MCP 服务器**（stdio）：暴露 8 个工具——`list_projects`、`scan`、
+  `status`、`overview`、`rules`、`document`、`export_evidence`、`import_semantic`。
+  AI 可以独立完成"扫描 → 读证据 → 读源码写语义 → 导入落库 → 生成客户交付总报告"
+  的完整闭环；工具错误以标准 MCP 错误返回中文可读原因。
+- MCP 数据库默认 `~/.c2b/c2b.db`（与客户端启动目录解耦）；`C2B_DB_URL` 指向与
+  Web 工作台相同的 PostgreSQL 时，AI 的分析结果直接出现在工作台里。
+- 依赖新增 `mcp>=2.0`（官方 SDK）。
+
+### 验证
+
+- 97 项 Python 回归测试通过（v0.4.0 为 93 项；新增 4 项：MCP 工具扫描-读回闭环、
+  证据导出/语义导入/规则查询、错误可读性、8 工具注册清单）。
+- 真实 stdio 握手实测：initialize → list_tools → scan → document → 错误路径
+  全部通过（MCP 2.x 客户端）。
+
 ## v0.4.0 — 2026-09-11
 
 发布状态：一键自动化与客户总报告版（功能版本）。

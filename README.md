@@ -1,7 +1,7 @@
 # Code2Business（C2B）—— 从遗留代码还原业务知识
 
-> 当前正式版本：[**v0.4.0**](https://github.com/imlao17/Code2Business/releases/tag/v0.4.0)，发布日期 2026-09-11。
-> 版本变化见 [CHANGELOG.md](CHANGELOG.md) 和 [v0.4.0 发布说明](docs/releases/v0.4.0.md)。本版本提供一键自动分析（扫描 → AI 归纳 → 模块规格）与合并的《客户交付总报告》，让不写代码的用户也能自助使用；不等同于多租户商业交付版。
+> 当前正式版本：[**v0.5.0**](https://github.com/imlao17/Code2Business/releases/tag/v0.5.0)，发布日期 2026-09-11。
+> 版本变化见 [CHANGELOG.md](CHANGELOG.md) 和 [v0.5.0 发布说明](docs/releases/v0.5.0.md)。本版本把 Code2Business 接入 MCP 标准：AI 客户端（ZCode/Claude 等）可把扫描、语义、总报告当作工具直接调用；不等同于多租户商业交付版。
 
 Code2Business 把旧系统代码转换为可追溯、可确认、可交付的业务资产：
 

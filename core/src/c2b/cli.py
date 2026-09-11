@@ -153,6 +153,17 @@ def label(project_id, limit, concurrency, entry_only, no_cache, model):
         s.close()
 
 
+@cli.command("mcp")
+def mcp():
+    """以 stdio 运行 MCP 服务器（供 ZCode 等 AI 客户端作为工具调用）。
+
+    数据库默认 ~/.c2b/c2b.db（与启动目录解耦）；用 C2B_DB_URL 指向与
+    Web 工作台相同的 PostgreSQL，AI 的分析结果会直接出现在工作台。
+    """
+    from .mcp_server import serve
+    serve()
+
+
 @cli.command("agent-schema")
 def agent_schema():
     """输出 Agent Native 语义 JSON 模板（无需 API Key）。"""

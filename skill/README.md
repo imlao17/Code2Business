@@ -1,6 +1,6 @@
 # C2B Agent Skills（产品③）
 
-> 当前正式版本：[v0.4.0](https://github.com/imlao17/Code2Business/releases/tag/v0.4.0)。完整变化见[仓库变更日志](../CHANGELOG.md)。
+> 当前正式版本：[v0.5.0](https://github.com/imlao17/Code2Business/releases/tag/v0.5.0)。完整变化见[仓库变更日志](../CHANGELOG.md)。
 
 这是面向 Claude Code、Codex、opencode 等兼容 Agent 宿主的独立技能产品。它让使用者通过自然语言编排“扫描 → 语义标注 → 模块规格 → 文档交付”，并要求 Agent 在每个阶段报告证据、覆盖范围和待确认项。
 
@@ -83,6 +83,31 @@ Agent Native 的结构化校验保证“结论能回到代码证据”，不自�
 ```
 
 也可直接命令行使用底层 c2b（命令见 `cli/README.md`）。
+
+### 通过 MCP 在任意 AI 客户端中调用（v0.5+）
+
+除了 Skills 对话编排，c2b 还内置 **MCP 服务器**（stdio）：ZCode、Claude Desktop、
+Codex 等任何支持 MCP 的客户端都能把 c2b 当作原生工具直接调用，无需加载技能：
+
+```json
+{
+  "mcp": {
+    "servers": {
+      "c2b": {
+        "command": "/Users/你/.c2b/venv/bin/c2b",
+        "args": ["mcp"]
+      }
+    }
+  }
+}
+```
+
+可用工具：`list_projects` / `scan` / `status` / `overview` / `rules` /
+`document` / `export_evidence` / `import_semantic`。AI 可以独立完成
+"扫描 → 读证据 → 读源码写语义 → 导入 → 生成客户交付总报告"闭环。
+数据库默认 `~/.c2b/c2b.db`；把 `C2B_DB_URL` 指向与 Web 工作台相同的
+PostgreSQL，AI 的分析结果会直接出现在工作台页面里（接入自建 AI 工作台的
+推荐路径）。详见 [v0.5.0 发布说明](../docs/releases/v0.5.0.md)。
 
 补充说明：
 - 若只想做秒级规模探测，不要把 `c2b scan --probe-only` 当作已完成扫描；它只返回规模信息与可复用的 `project_id/scan_id`

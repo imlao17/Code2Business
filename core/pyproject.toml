@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "c2b"
-version = "0.4.0"
+version = "0.5.0"
 description = "Code2Business - 遗留系统业务知识还原平台（MVP）"
 requires-python = ">=3.11"
 dependencies = [
@@ -23,6 +23,7 @@ dependencies = [
     "python-docx>=1.1",
     "openpyxl>=3.1",
     "httpx>=0.27",
+    "mcp>=2.0",
 ]
 
 [project.scripts]
