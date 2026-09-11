@@ -359,6 +359,116 @@ def docs(project_id, doc_type, fmt, output, draft):
         s.close()
 
 
+@cli.command("pipeline")
+@click.argument("code_root", type=click.Path(exists=True, file_okay=False,
+                                              path_type=Path))
+@click.option("--name", default=None, help="项目名（默认取目录名）")
+@click.option("--project-id", default=None, type=int,
+              help="复用已有项目（缺省则新建项目）")
+@click.option("--out", "out_dir", default="c2b-deliverables",
+              type=click.Path(file_okay=False, path_type=Path),
+              show_default=True, help="交付文档输出目录")
+@click.option("--fmt", default="both", type=click.Choice(["md", "word", "both"]),
+              help="交付文档格式（默认同时输出 Markdown 与 Word）")
+@click.option("--draft/--official", default=True,
+              help="文档口径：草稿（默认，含 AI 未确认项）/ 正式（仅人工确认项）")
+@click.option("--no-ai", is_flag=True,
+              help="只做确定性扫描，跳过 AI 标注与模块需求规格")
+@click.option("--limit", default=200, show_default=True, help="标注方法数上限")
+@click.option("--concurrency", default=8, show_default=True, help="LLM 并发数")
+def pipeline(code_root: Path, name, project_id, out_dir: Path, fmt, draft,
+             no_ai, limit, concurrency):
+    """一条命令：扫描 → AI 标注 → 模块需求规格 → 全部交付文档落盘。
+
+    产出为草稿口径时可立即交付评审；正式口径文档仅包含人工已确认知识，
+    请先在 Web 工作台或通过确认流程核实规则后使用 --official 重新导出。
+    """
+    from .automation import ai_ready, run_auto
+    from .documents import DOC_TYPES, _gather, render, to_word
+    from sqlalchemy import select
+
+    init_db()
+    s = SessionLocal()
+    try:
+        if project_id is not None:
+            project = s.get(models.Project, project_id)
+            if project is None:
+                raise click.ClickException(f"项目 {project_id} 不存在")
+        else:
+            project = models.Project(name=name or code_root.name,
+                                     repo_path=str(code_root))
+            s.add(project)
+            s.commit()
+            click.echo(f"已创建项目 ID: {project.id}")
+        pid = project.id
+    finally:
+        s.close()
+
+    last_shown = {"key": None}
+
+    def progress(stage: str, done=None, total=None):
+        key = (stage, done, total)
+        if last_shown["key"] == key:
+            return
+        last_shown["key"] = key
+        if stage == "scan" or stage.startswith("scan:"):
+            click.echo(f"[1/3] 确定性扫描 {stage} ...")
+        elif stage == "label" or stage.startswith("label:"):
+            if done is None:
+                click.echo("[2/3] AI 语义标注 ...")
+            else:
+                click.echo(f"[2/3] AI 语义标注 {stage.split(':', 1)[-1]} "
+                           f"{done}/{total}")
+        elif stage == "modules":
+            click.echo(f"[3/3] 模块需求规格 {done}/{total}")
+
+    try:
+        result = run_auto(pid, run_ai=not no_ai, label_limit=limit,
+                          concurrency=concurrency, progress_cb=progress)
+    except Exception as e:
+        click.echo(f"自动分析失败: {e}", err=True)
+        sys.exit(1)
+
+    for note in result.get("notes", []):
+        click.echo(f"说明：{note}")
+
+    s = SessionLocal()
+    try:
+        scan = s.execute(
+            select(models.Scan).where(
+                models.Scan.project_id == pid,
+                models.Scan.status == models.ScanStatus.DONE,
+            ).order_by(models.Scan.id.desc()).limit(1)).scalar_one_or_none()
+        if scan is None:
+            raise click.ClickException("没有已完成的扫描，无法生成文档")
+        d = _gather(s, scan.id, include_unconfirmed=draft)
+        if not draft and not d["rules"]:
+            click.echo("提醒：正式口径下没有任何已确认规则，正式文档将接近空壳；"
+                       "请先确认规则或改用 --draft。", err=True)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        written = []
+        for n, (key, (title, _desc)) in enumerate(DOC_TYPES.items(), 1):
+            md = render(key, d)
+            if fmt in ("md", "both"):
+                p = out_dir / f"{n:02d}-{key}-{title}.md"
+                p.write_text(md, encoding="utf-8")
+                written.append(p)
+            if fmt in ("word", "both"):
+                p = out_dir / f"{n:02d}-{key}-{title}.docx"
+                p.write_bytes(to_word(md, title).getvalue())
+                written.append(p)
+    finally:
+        s.close()
+
+    click.echo("")
+    click.echo(f"完成：项目 {pid}，交付文档 {len(written)} 份已写入 {out_dir}/")
+    for p in written:
+        click.echo(f"  - {p}")
+    if draft:
+        click.echo("当前为草稿口径（含 AI 未确认内容）；人工确认规则后可用 "
+                   "--official 重新导出正式版。")
+
+
 @cli.command()
 @click.argument("project_id", type=int)
 @click.argument("question")

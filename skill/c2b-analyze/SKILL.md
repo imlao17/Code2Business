@@ -7,6 +7,16 @@ description: Code2Business 遗留系统业务知识还原（完整版）主入�
 
 把旧代码库还原为业务资产，产出与网页端相同的结果。**必须按以下三个阶段顺序执行**，每阶段完成后向用户汇报进度。
 
+## 快速通道（v0.4+，用户只想要结果时）
+
+```bash
+c2b pipeline <代码目录> --name <项目名> --out ./deliverables
+```
+
+一条命令完成 扫描 → AI 标注（云端 Provider）→ 模块规格 → 全部 7 类交付文档落盘
+（`--no-ai` 只做确定性扫描；`--official` 仅含人工确认知识）。默认输出仍需向用户
+展示关键统计与待确认项；需要 Agent 级语义质量或无云端 Key 时，走下面的三阶段流程。
+
 ## 前置检查
 
 1. 确认 c2b 已安装：`c2b --help`（若失败：
@@ -42,10 +52,14 @@ c2b import-semantic <project_id> --input c2b-semantic-result.json
 ## 阶段三：交付（调用 c2b-docs）
 
 ```bash
+c2b docs <project_id> --type combined --fmt word --output 客户交付总报告.docx
 c2b docs <project_id> --type overview --output 系统现状说明书.md
 c2b docs <project_id> --type rules --output 业务规则清单.md
 c2b export-specs <project_id> --output module-specs.zip
 ```
+
+- 面向客户/业务人员时优先产出 `combined` 客户交付总报告（一份合并报告，
+  含执行摘要、功能、流程、核心规则、验收与待确认）。
 
 ## 完成汇报模板
 
@@ -54,6 +68,7 @@ c2b export-specs <project_id> --output module-specs.zip
 - 代码规模：X 行 / Y 文件 / N 模块（档位：XL）
 - 业务图谱：M 条规则 / O 个业务对象 / F 条流程 / 推演主线
 - 交付物：
+  - 客户交付总报告.docx（合并版，推荐先看这份）
   - 系统现状说明书.md
   - 模块需求规格.zip（K 份）
 - 待确认项：Q 项（见 questions 表，网页「待确认项」页可处理）

@@ -43,3 +43,6 @@ desktop/dist/
 .idea/
 .vscode/
 .omx/
+
+# --- Agent 会话产物 ---
+.zcode/

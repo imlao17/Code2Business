@@ -476,6 +476,53 @@ def start_scan(pid: int, s: Session = Depends(get_session)):
     return {"ok": True, "job_id": job.id, "message": "扫描任务已启动"}
 
 
+class AutoRunIn(BaseModel):
+    run_ai: bool = True
+
+
+@router.post("/projects/{pid}/auto-run")
+def auto_run(pid: int, body: AutoRunIn | None = None):
+    """一键自动分析：扫描（如需）→ AI 标注 → 模块需求规格（异步）。
+
+    与单独的扫描/标注任务共用每项目唯一任务槽；产出为可核对的草稿知识，
+    正式文档仍以人工确认为边界。未配置 AI 时只完成扫描并在任务结果里说明。
+    """
+    from ..automation import ai_ready, run_auto
+
+    s = SessionLocal()
+    try:
+        project = s.get(models.Project, pid)
+        if project is None:
+            raise HTTPException(404, "项目不存在")
+        run_ai = body.run_ai if body is not None else True
+        job = _create_project_job(s, pid, limit=0, stage="auto:preparing")
+        job_id = job.id
+        ready = ai_ready()
+
+        def _worker(job_id: int, project_id: int, run_ai: bool):
+            lease = _JobLease(job_id)
+            lease.start()
+            try:
+                def cb(stage: str, done=None, total=None):
+                    _touch_project_job(job_id, stage=f"auto:{stage}",
+                                       progress=done, total=total)
+
+                result = run_auto(project_id, run_ai=run_ai, progress_cb=cb)
+                _complete_project_job(job_id, result=result)
+            except Exception as exc:
+                _complete_project_job(job_id, error=exc)
+            finally:
+                lease.stop()
+
+        threading.Thread(target=_worker, args=(job_id, pid, run_ai),
+                         daemon=True).start()
+        return {"ok": True, "job_id": job_id, "ai_ready": ready,
+                "message": "一键分析已启动" if (run_ai and ready)
+                else "一键分析已启动（将只完成确定性扫描）"}
+    finally:
+        s.close()
+
+
 @router.delete("/projects/{pid}")
 def delete_project(pid: int, delete_files: bool = True,
                    s: Session = Depends(get_session)):
@@ -584,13 +631,14 @@ def pipeline(pid: int, s: Session = Depends(get_session)):
         running_job and str(running_job.stage).startswith("import:")
     ) else None
     # ``git`` preserves the display of v0.2.2 jobs that combined clone + scan.
+    # ``auto:scan`` is the one-click pipeline's deterministic scan phase.
     running_scan = running_job if (running_job and
-                                   str(running_job.stage).startswith(("scan", "git"))) else None
+                                   str(running_job.stage).startswith(
+                                       ("scan", "git", "auto:scan"))) else None
+    # 其余阶段都归入「AI 分析」步骤展示：经典标注、模块规格（含一键流程的
+    # auto:label / auto:modules），让批量模块分析也不再是流程条上的盲区。
     running_label = running_job if (
-        running_job
-        and not str(running_job.stage).startswith(
-            ("import:", "scan", "git", "modules")
-        )
+        running_job and running_import is None and running_scan is None
     ) else None
     failed_import = next((
         j for j in jobs
@@ -1190,6 +1238,50 @@ def confirm_rules_batch(
         "confirmed": len(rules) if body.action == "confirm" else 0,
         "discarded": len(rules) if body.action == "discard" else 0,
     }
+
+
+class HighConfidenceConfirmIn(BaseModel):
+    min_confidence: int = Field(default=80, ge=50, le=100)
+    limit: int = Field(default=200, ge=1, le=5000)
+    dry_run: bool = True
+    user: str | None = Field(default=None, max_length=100)
+    note: str | None = Field(default=None, max_length=4000)
+
+
+@router.post("/projects/{pid}/rules/confirm-high-confidence")
+def confirm_high_confidence_rules(
+    pid: int, body: HighConfidenceConfirmIn, s: Session = Depends(get_session)
+):
+    """按 AI 可信度阈值批量确认规则（dry_run 先返回将影响的条数）。
+
+    只作用于 AI 标注（未确认）状态的规则，已确认/已修改/已废弃/冲突的
+    规则不受影响；每次确认都写入与手动确认相同的审计流水。"""
+    scan = _latest_scan(s, pid)
+    rules = list(s.execute(
+        select(models.BusinessRule).where(
+            models.BusinessRule.scan_id == scan.id,
+            models.BusinessRule.state == models.RuleState.AI_LABELED,
+            models.BusinessRule.confidence >= body.min_confidence,
+        ).order_by(models.BusinessRule.confidence.desc())
+        .limit(body.limit)
+    ).scalars().all())
+    if body.dry_run:
+        return {
+            "ok": True, "dry_run": True, "count": len(rules),
+            "min_confidence": rules[-1].confidence if rules else None,
+            "max_confidence": rules[0].confidence if rules else None,
+        }
+    for rule in rules:
+        before = _rule_audit_snapshot(rule)
+        rule.state = models.RuleState.CONFIRMED
+        s.add(models.Confirmation(
+            scan_id=scan.id, user_id=body.user or "anonymous", target_type="rule",
+            target_id=rule.id, action="confirm", before=before,
+            after=_rule_audit_snapshot(rule),
+            note=body.note or f"按可信度≥{body.min_confidence}批量确认"))
+    s.commit()
+    return {"ok": True, "dry_run": False, "confirmed": len(rules),
+            "min_confidence": body.min_confidence}
 
 
 @router.get("/projects/{pid}/rules/export")

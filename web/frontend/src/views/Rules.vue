@@ -26,6 +26,7 @@
         <el-button type="success" :disabled="!selected.length" @click="batchConfirm">
           批量确认（{{ selected.length }}）
         </el-button>
+        <el-button type="warning" @click="openHighConf">按可信度一键确认</el-button>
         <el-button @click="exportExcel">导出已确认 Excel</el-button>
         <span class="count">共 {{ rules.length }} 条</span>
       </div>
@@ -104,6 +105,33 @@
       </div>
     </el-drawer>
 
+    <el-dialog v-model="highConfOpen" title="按可信度一键确认" width="480px">
+      <div class="highconf-body">
+        <p>
+          把 AI 可信度不低于阈值的「AI 识别」规则一次性确认为已核实。
+          适合快速推进：先确认高把握的，再人工检查剩下的。
+        </p>
+        <div class="highconf-row">
+          <span>可信度阈值 ≥</span>
+          <el-input-number v-model="highConfMin" :min="50" :max="100" :step="5"
+                           @change="loadHighConfCount" />
+          <span class="highconf-count">
+            将确认 <b>{{ highConfCount }}</b> 条（不影响已确认/已废弃/冲突的规则）
+          </span>
+        </div>
+        <p class="highconf-hint">
+          每一条都会像手动确认一样写入确认记录（操作人 web-user），可追溯。
+        </p>
+      </div>
+      <template #footer>
+        <el-button @click="highConfOpen = false">取消</el-button>
+        <el-button type="warning" :loading="highConfBusy" :disabled="!highConfCount"
+                   @click="confirmHighConf">
+          确认这 {{ highConfCount }} 条
+        </el-button>
+      </template>
+    </el-dialog>
+
     <el-dialog v-model="modifyOpen" title="修改规则" width="760px" destroy-on-close>
       <el-form label-width="96px">
         <el-form-item label="规则名称">
@@ -161,6 +189,7 @@ import { ElMessage } from 'element-plus'
 import api from '../api'
 import GuideBanner from '../components/GuideBanner.vue'
 import RuntimeEvidencePanel from '../components/RuntimeEvidencePanel.vue'
+import { friendlyError } from '../errors'
 
 const props = defineProps({ pid: { type: [Number, String], default: null } })
 const rules = ref([])
@@ -301,12 +330,55 @@ async function submitModify() {
 
 async function batchConfirm() {
   if (!selected.value.length) return
-  await api.post(`/projects/${props.pid}/rules/confirm-batch`, {
-    ids: selected.value, action: 'confirm', user: 'web-user'
-  })
-  ElMessage.success(`已批量确认 ${selected.value.length} 条规则`)
-  selected.value = []
-  load()
+  try {
+    await api.post(`/projects/${props.pid}/rules/confirm-batch`, {
+      ids: selected.value, action: 'confirm', user: 'web-user'
+    })
+    ElMessage.success(`已批量确认 ${selected.value.length} 条规则`)
+    selected.value = []
+    load()
+  } catch (e) {
+    ElMessage.error(friendlyError(e, '批量确认失败'))
+  }
+}
+
+// ---------- 按可信度一键确认 ----------
+const highConfOpen = ref(false)
+const highConfMin = ref(80)
+const highConfCount = ref(0)
+const highConfBusy = ref(false)
+
+async function loadHighConfCount() {
+  try {
+    const r = (await api.post(`/projects/${props.pid}/rules/confirm-high-confidence`, {
+      min_confidence: highConfMin.value, dry_run: true
+    })).data
+    highConfCount.value = r.count
+  } catch (e) {
+    highConfCount.value = 0
+    ElMessage.error(friendlyError(e, '统计失败'))
+  }
+}
+
+function openHighConf() {
+  highConfOpen.value = true
+  loadHighConfCount()
+}
+
+async function confirmHighConf() {
+  highConfBusy.value = true
+  try {
+    const r = (await api.post(`/projects/${props.pid}/rules/confirm-high-confidence`, {
+      min_confidence: highConfMin.value, dry_run: false, user: 'web-user'
+    })).data
+    ElMessage.success(`已按可信度 ≥${r.min_confidence} 确认 ${r.confirmed} 条规则`)
+    highConfOpen.value = false
+    load()
+  } catch (e) {
+    ElMessage.error(friendlyError(e, '一键确认失败'))
+  } finally {
+    highConfBusy.value = false
+  }
 }
 
 async function exportExcel() {
@@ -335,4 +407,8 @@ onMounted(load)
 .snippet-title { font-weight: 600; margin: 14px 0 6px; }
 .actions { margin-top: 16px; display: flex; gap: 10px; align-items: center; }
 :deep(.row-discarded) { opacity: 0.5; }
+.highconf-body { font-size: 13px; color: #4b5563; line-height: 1.8; }
+.highconf-row { display: flex; align-items: center; gap: 10px; margin: 10px 0; }
+.highconf-count b { color: #e6a23c; font-size: 16px; }
+.highconf-hint { color: #9ca3af; font-size: 12px; }
 </style>

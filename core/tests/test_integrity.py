@@ -18,15 +18,19 @@ from sqlalchemy.orm import sessionmaker
 from c2b import models
 from c2b.api.main import healthz
 from c2b.api.routes import (
+    AutoRunIn,
     BatchConfirmIn,
     ConfirmIn,
+    HighConfidenceConfirmIn,
     LocalProjectImportIn,
     RuntimeEvidenceIn,
     _create_project_job,
     _excel_safe,
     _latest_scan,
     analyze_all_modules,
+    auto_run,
     biz_chain,
+    confirm_high_confidence_rules,
     confirm_rule,
     confirm_rules_batch,
     delete_project,
@@ -593,6 +597,123 @@ class ExportSafetyTests(unittest.TestCase):
                 self.assertTrue(_excel_safe(value).startswith("'"))
         self.assertEqual(_excel_safe("ordinary"), "ordinary")
         self.assertIsNone(_excel_safe(None))
+
+
+class AutoRunEndpointTests(DatabaseTestCase):
+    def _repo_with_java(self) -> Path:
+        root = Path(self.tmp.name) / "repo"
+        root.mkdir(exist_ok=True)
+        (root / "Demo.java").write_text(
+            "public class Demo {\n"
+            "    /** 创建订单 */\n"
+            "    public void createOrder(int a) {\n"
+            "        if (a > 0) {\n"
+            "        }\n"
+            "    }\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        return root
+
+    def test_auto_run_without_ai_completes_scan_only(self):
+        root = self._repo_with_java()
+        project = models.Project(name="auto", repo_path=str(root))
+        self.s.add(project)
+        self.s.commit()
+
+        with patch.dict("os.environ", {"C2B_LLM_MODE": "api"}), patch(
+            "c2b.db.SessionLocal", self.Session
+        ), patch(
+            "c2b.api.routes.SessionLocal", self.Session
+        ), patch(
+            "c2b.settings_store.CONFIG_FILE", Path(self.tmp.name) / "cfg.json"
+        ):
+            result = auto_run(project.id, AutoRunIn(run_ai=False))
+            self.assertFalse(result["ai_ready"])
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline:
+                with self.Session() as check:
+                    job = check.get(models.LabelJob, result["job_id"])
+                    if job.status != "running":
+                        break
+                time.sleep(0.01)
+            else:
+                self.fail("auto-run job did not finish")
+
+        with self.Session() as check:
+            job = check.get(models.LabelJob, result["job_id"])
+            self.assertEqual(job.status, "done")
+            self.assertTrue(job.result["scanned"])
+            self.assertFalse(job.result["ai_ran"])
+            scans = list(check.execute(
+                select(models.Scan).where(
+                    models.Scan.project_id == project.id)).scalars())
+            self.assertEqual(len(scans), 1)
+            self.assertEqual(scans[0].status, models.ScanStatus.DONE)
+
+        flow = pipeline(project.id, self.s)
+        scan_step = next(st for st in flow["steps"] if st["key"] == "scan")
+        self.assertEqual(scan_step["status"], "done")
+        label_step = next(st for st in flow["steps"] if st["key"] == "label")
+        self.assertEqual(label_step["status"], "pending")
+
+    def test_pipeline_maps_auto_and_module_stages_to_label_step(self):
+        project, _scan = self.project_with_scan("auto-stages")
+        job = models.LabelJob(project_id=project.id, status="running",
+                              stage="auto:label:rules", limit=0)
+        self.s.add(job)
+        self.s.commit()
+
+        flow = pipeline(project.id, self.s)
+        label_step = next(st for st in flow["steps"] if st["key"] == "label")
+        self.assertEqual(label_step["status"], "running")
+        self.assertTrue(label_step["stage"].startswith("auto:"))
+
+        job.stage = "modules:Demo"
+        self.s.commit()
+        flow = pipeline(project.id, self.s)
+        label_step = next(st for st in flow["steps"] if st["key"] == "label")
+        self.assertEqual(label_step["status"], "running")
+
+
+class HighConfidenceConfirmTests(DatabaseTestCase):
+    def test_dry_run_counts_then_confirm_writes_audit(self):
+        project, scan = self.project_with_scan("high-confidence")
+        self.s.add_all([
+            models.BusinessRule(scan_id=scan.id, name="r90", confidence=90,
+                                state=models.RuleState.AI_LABELED),
+            models.BusinessRule(scan_id=scan.id, name="r70", confidence=70,
+                                state=models.RuleState.AI_LABELED),
+            models.BusinessRule(scan_id=scan.id, name="already", confidence=95,
+                                state=models.RuleState.CONFIRMED),
+            models.BusinessRule(scan_id=scan.id, name="conflict", confidence=99,
+                                state=models.RuleState.CONFLICT),
+        ])
+        self.s.commit()
+
+        dry = confirm_high_confidence_rules(
+            project.id,
+            HighConfidenceConfirmIn(min_confidence=80, dry_run=True), self.s)
+        self.assertTrue(dry["dry_run"])
+        self.assertEqual(dry["count"], 1)
+        self.assertEqual(dry["max_confidence"], 90)
+
+        real = confirm_high_confidence_rules(
+            project.id,
+            HighConfidenceConfirmIn(min_confidence=70, dry_run=False,
+                                    user="tester"), self.s)
+        self.assertEqual(real["confirmed"], 2)
+
+        states = {r.name: r.state for r in self.s.execute(
+            select(models.BusinessRule)).scalars()}
+        self.assertEqual(states["r90"], models.RuleState.CONFIRMED)
+        self.assertEqual(states["r70"], models.RuleState.CONFIRMED)
+        self.assertEqual(states["already"], models.RuleState.CONFIRMED)
+        self.assertEqual(states["conflict"], models.RuleState.CONFLICT)
+
+        audits = list(self.s.execute(select(models.Confirmation)).scalars())
+        self.assertEqual(len(audits), 2)
+        self.assertTrue(all(a.user_id == "tester" for a in audits))
 
 
 class ModuleBatchOutcomeTests(DatabaseTestCase):

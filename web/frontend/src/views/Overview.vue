@@ -166,16 +166,16 @@ const ruleTypePct = n => {
 }
 
 const guideMap = {
-  scan: { desc: '代码已经导入。确认来源无误后，开始构建模块、类、调用关系和 SQL 图谱。',
-          status: '等待开始扫描', type: 'primary', action: '开始扫描' },
-  label: { desc: '扫描已完成。点击「运行标注」让 AI 识别业务域、业务对象与规则卡片（375+ 条规则，耗时取决于代码量）。',
-           status: '等待 AI 标注', type: 'warning', action: '运行标注' },
-  graph: { desc: '标注完成，业务图谱已生成。到「业务对象与流程」「业务推演」查看识别结果。',
+  scan: { desc: '代码已经导入。确认来源无误后开始分析；点击「一键分析」会自动完成扫描和后续 AI 归纳。',
+          status: '等待开始分析', type: 'primary', action: '一键分析' },
+  label: { desc: '扫描已完成。点击「一键分析」让 AI 自动归纳业务域、业务对象、规则卡片和模块规格（耗时取决于代码量与 AI 服务速度）。',
+           status: '等待 AI 归纳', type: 'warning', action: '一键分析' },
+  graph: { desc: 'AI 归纳完成，业务图谱已生成。到「业务对象与流程」「业务推演」查看识别结果。',
            status: '业务图谱已生成', type: 'success', action: '查看业务图谱', page: '/business' },
-  confirm: { desc: '规则卡片已生成。到「流程与规则」页逐条确认，确认后的规则才会进入交付文档。',
+  confirm: { desc: '规则卡片已生成。到「流程与规则」页确认规则（可用「按可信度一键确认」加速），确认后的规则才会进入正式交付文档。',
              status: '等待人工确认', type: 'warning', action: '去确认规则', page: '/rules' },
-  export: { desc: '所有步骤已完成。到「交付物中心」生成并下载交付文档与模块需求规格。',
-            status: '流程已完成', type: 'success', action: '导出交付文档', page: '/documents' }
+  export: { desc: '所有步骤已完成。到「文档与验收」下载《客户交付总报告》（Word）或专项交付文档。',
+            status: '流程已完成', type: 'success', action: '去下载报告', page: '/documents' }
 }
 
 const guideDesc = computed(() => {
@@ -216,10 +216,8 @@ function goGuide() {
   }
   if (g.page) {
     router.push(g.page)
-  } else if (g.action === '开始扫描') {
-    emit('start-scan')
-  } else if (g.action === '运行标注') {
-    window.dispatchEvent(new CustomEvent('request-label'))
+  } else if (g.action === '一键分析') {
+    window.dispatchEvent(new CustomEvent('request-autorun'))
   }
 }
 

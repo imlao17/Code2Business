@@ -13,7 +13,7 @@
         <el-menu-item index="/rules">流程与规则</el-menu-item>
         <el-menu-item index="/data">数据与接口</el-menu-item>
         <el-menu-item index="/questions">待确认项</el-menu-item>
-        <el-menu-item index="/documents">文档与验收</el-menu-item>
+        <el-menu-item index="/documents">文档与交付物</el-menu-item>
       </el-menu>
     </el-aside>
     <el-container>
@@ -21,12 +21,15 @@
         <div class="title">{{ $route.meta.title }}</div>
         <div class="header-right">
           <span v-if="isDesktop" class="local-only">本地工作台 · 数据仅保存在此 Mac</span>
+          <el-button size="small" type="warning" :loading="autoRunning"
+                     :disabled="!pid" @click="runAuto">一键分析</el-button>
           <el-button size="small" type="primary" :loading="labeling"
                      :disabled="!pid" @click="runLabel">运行标注</el-button>
           <el-button size="small" type="success" @click="importOpen = true">新建项目</el-button>
           <el-tag size="small" :type="llm.mode === 'mock' ? 'warning' : 'success'" class="mr8">
             {{ llm.mode === 'mock' ? 'MOCK' : 'API' }}{{ llm.has_key ? '' : ' 未配Key' }}
           </el-tag>
+          <el-button size="small" @click="helpOpen = true">帮助</el-button>
           <el-button size="small" @click="settingsOpen = true">LLM 设置</el-button>
           <el-select v-model="pid" placeholder="选择项目" style="width: 280px"
                      @change="onProject" filterable>
@@ -66,6 +69,7 @@
               ? (pipeline.next.key === 'scan' ? '重新扫描' : '重新导入')
               : '去执行' }}
           </el-button>
+          <el-button v-else size="small" @click="routerPush('/overview')">查看进度</el-button>
         </div>
       </div>
       <el-main class="main">
@@ -73,6 +77,7 @@
                      @start-scan="startScan" />
       </el-main>
       <QaFloat :pid="pid" />
+      <HelpDrawer v-model="helpOpen" :llm="llm" />
 
       <el-dialog v-model="importOpen" title="新建项目（导入代码）" width="520px">
         <el-form label-width="90px">
@@ -117,12 +122,17 @@
       </el-dialog>
 
       <el-dialog v-model="settingsOpen" title="LLM 设置" width="480px">
+        <el-alert type="info" :closable="false" class="llm-intro"
+                  title="这一步是给「AI 分析」接一个大模型服务"
+                  description="没有 Key 也可以先扫描、看图谱；配置后才能自动归纳业务规则和生成模块规格。
+                  推荐 DeepSeek（便宜、国内直连）：注册后在官方后台创建 API Key 填到下面即可。" />
         <el-form label-width="90px">
           <el-form-item label="模式">
             <el-radio-group v-model="llmForm.mode">
               <el-radio value="api">API（云端）</el-radio>
-              <el-radio value="mock">Mock（模拟）</el-radio>
+              <el-radio value="mock">Mock（模拟演示）</el-radio>
             </el-radio-group>
+            <div class="form-hint">Mock 用内置模拟数据演示流程，不做真实业务分析。</div>
           </el-form-item>
           <el-form-item v-if="llmForm.mode === 'api'" label="Provider">
             <el-select v-model="llmForm.provider" style="width: 100%">
@@ -163,15 +173,19 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import api, { LONG_REQUEST_TIMEOUT } from './api'
 import { chooseLocalSourceDirectory, isDesktop } from './desktop'
+import { friendlyError } from './errors'
 const QaFloat = defineAsyncComponent(() => import('./components/QaFloat.vue'))
+const HelpDrawer = defineAsyncComponent(() => import('./components/HelpDrawer.vue'))
 
 const routerPush = useRouter().push
 
 const pid = ref(null)
 const projects = ref([])
 const settingsOpen = ref(false)
+const helpOpen = ref(false)
 const testing = ref(false)
 const labeling = ref(false)
+const autoRunning = ref(false)
 const importOpen = ref(false)
 const importing = ref(false)
 const importPercent = ref(0)
@@ -183,6 +197,8 @@ const importForm = reactive({
 let zipFile = null
 let importTimer = null
 let importContext = null
+let autoTimer = null
+let autoContext = null
 const llm = reactive({
   provider: 'openai_compatible', mode: 'api', has_key: false,
   key_masked: '', key_storage: 'config_file'
@@ -232,7 +248,7 @@ async function goStep(st) {
     return
   }
   if (st.key === 'label' && st.status === 'pending') {
-    ElMessage.info('扫描完成后点击「运行标注」')
+    ElMessage.info('点击顶部「一键分析」可自动完成 AI 归纳；也可以用「运行标注」只跑标注')
     return
   }
   routerPush(st.page)
@@ -246,8 +262,7 @@ async function startScan() {
     await loadPipeline()
     routerPush('/overview')
   } catch (e) {
-    const detail = e?.response?.data?.detail || e?.message || String(e)
-    ElMessage.error(typeof detail === 'string' ? detail : JSON.stringify(detail))
+    ElMessage.error(friendlyError(e, '扫描启动失败'))
   }
 }
 
@@ -308,6 +323,65 @@ function stopLabelPoll(resetState = false) {
   labelContext = null
   if (resetState) {
     labeling.value = false
+  }
+}
+
+function stopAutoPoll(resetState = false) {
+  if (autoTimer) {
+    clearInterval(autoTimer)
+    autoTimer = null
+  }
+  autoContext = null
+  if (resetState) {
+    autoRunning.value = false
+  }
+}
+
+async function runAuto() {
+  if (!pid.value) return
+  const projectId = pid.value
+  stopAutoPoll()
+  autoRunning.value = true
+  autoContext = { projectId }
+  try {
+    const r = (await api.post(`/projects/${projectId}/auto-run`, { run_ai: true })).data
+    if (!r.ai_ready) {
+      ElMessage.info('尚未配置 AI 服务：本次将只完成扫描与图谱，配置 Key 后可继续自动标注')
+    } else {
+      ElMessage.success('一键分析已启动：扫描 → AI 归纳 → 模块分析，可离开页面，进度见流程条')
+    }
+    await loadPipeline()
+    routerPush('/overview')
+    autoTimer = setInterval(async () => {
+      if (!autoContext || autoContext.projectId !== projectId) return
+      try {
+        const j = (await api.get(`/projects/${projectId}/label-jobs/${r.job_id}`)).data
+        if (j.status === 'done') {
+          stopAutoPoll()
+          const res = j.result || {}
+          const summary = res.ai_ran
+            ? `规则 ${res.label?.rules || 0} 条 / 对象 ${res.label?.objects || 0} / 模块规格 ${res.modules?.analyzed || 0}`
+            : '已完成确定性扫描与图谱'
+          ElMessage.success(`一键分析完成（${summary}）`)
+          if (res.notes?.length) {
+            ElMessage.info({ message: res.notes[0], duration: 8000 })
+          }
+          ElMessage.info('现在可以到「文档与验收」下载草稿版《客户交付总报告》；确认规则后可出正式版')
+          if (pid.value === projectId) {
+            window.dispatchEvent(new CustomEvent('project-changed', { detail: projectId }))
+            loadPipeline()
+          }
+        } else if (j.status === 'failed') {
+          stopAutoPoll()
+          ElMessageBox.alert(friendlyError({ message: j.error }, '一键分析失败'), '一键分析失败')
+        }
+      } catch {
+        // 轮询失败忽略，下轮重试
+      }
+    }, 3000)
+  } catch (e) {
+    stopAutoPoll()
+    ElMessage.error(friendlyError(e, '一键分析启动失败'))
   }
 }
 
@@ -419,9 +493,7 @@ async function doImport() {
     importing.value = false
     importStatus.value = 'exception'
     importStage.value = ''
-    // 显示后端返回的具体错误（detail）
-    const detail = e?.response?.data?.detail || e?.message || String(e)
-    ElMessage.error(typeof detail === 'string' ? detail : JSON.stringify(detail))
+    ElMessage.error(friendlyError(e, '代码导入失败'))
   }
 }
 
@@ -501,7 +573,7 @@ async function runLabel() {
   } catch (e) {
     stopLabelPoll()
     labeling.value = false
-    ElMessageBox.alert(String(e), '标注失败')
+    ElMessageBox.alert(friendlyError(e, '标注失败'), '标注失败')
   }
 }
 async function askDelete() {
@@ -524,7 +596,7 @@ async function askDelete() {
     if (projects.value.length) pid.value = projects.value[0].id
     window.dispatchEvent(new CustomEvent('project-changed', { detail: pid.value || deletedPid }))
   } catch (e) {
-    ElMessage.error(e?.response?.data?.detail || String(e))
+    ElMessage.error(friendlyError(e, '删除项目失败'))
   }
 }
 
@@ -536,6 +608,10 @@ function handleRequestLabel() {
   runLabel()
 }
 
+function handleRequestAutoRun() {
+  runAuto()
+}
+
 watch(pid, (nextPid, prevPid) => {
   if (nextPid !== prevPid) {
     if (labelContext) {
@@ -543,6 +619,9 @@ watch(pid, (nextPid, prevPid) => {
     }
     if (importContext) {
       stopImportPoll(true)
+    }
+    if (autoContext) {
+      stopAutoPoll(true)
     }
   }
   loadPipeline()
@@ -553,13 +632,16 @@ onMounted(() => {
   loadProjects()
   loadLlm()
   window.addEventListener('request-label', handleRequestLabel)
+  window.addEventListener('request-autorun', handleRequestAutoRun)
 })
 
 onUnmounted(() => {
   stopImportPoll(true)
   stopLabelPoll(true)
+  stopAutoPoll(true)
   stopPipelinePoll()
   window.removeEventListener('request-label', handleRequestLabel)
+  window.removeEventListener('request-autorun', handleRequestAutoRun)
 })
 </script>
 
@@ -586,6 +668,7 @@ html, body, #app { height: 100%; margin: 0; }
                  gap: 10px; justify-content: center; align-items: center;
                  color: #6b7280; font-size: 13px; }
 .main { background: #f3f4f6; overflow: auto; }
+.llm-intro { margin-bottom: 14px; }
 .desktop-shell .aside { background: #17212d; }
 .desktop-shell .menu .el-menu-item { margin: 3px 8px; border-radius: 7px; height: 38px; line-height: 38px; }
 .desktop-shell .menu .el-menu-item.is-active { background: #314158; }
