@@ -30,6 +30,13 @@ osascript -e 'quit app "C2B Desktop"' >/dev/null 2>&1 || true
 sleep 1
 pkill -f "c2b-desktop" 2>/dev/null || true
 pkill -f "Resources/c2b-api" 2>/dev/null || true
+pkill -f "uvicorn c2b.api.main" 2>/dev/null || true
+# PyInstaller onefile 有父子两个进程，退出需要时间；端口未释放时新 App 会复用旧引擎
+for i in $(seq 1 20); do
+  curl -sf -m 1 "$BASE_URL/healthz" >/dev/null 2>&1 || break
+  sleep 1
+done
+curl -sf -m 1 "$BASE_URL/healthz" >/dev/null 2>&1 && fail "旧引擎端口 8123 迟迟未释放"
 sleep 1
 
 # 样例仓库
