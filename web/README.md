@@ -1,6 +1,6 @@
 # C2B Web 工作台（产品①）
 
-> 当前正式版本：[v0.5.0](https://github.com/imlao17/Code2Business/releases/tag/v0.5.0)。完整变化见[仓库变更日志](../CHANGELOG.md)。
+> 当前正式版本：[v0.6.0](https://github.com/imlao17/Code2Business/releases/tag/v0.6.0)。完整变化见[仓库变更日志](../CHANGELOG.md)。
 
 这是面向本地单团队评审和交付演示的独立 Web 产品：项目导入、扫描、AI 标注、业务图谱、模块需求规格、业务推演、人工确认、AI 问答与文档导出都在浏览器内完成。
 

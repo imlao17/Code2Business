@@ -1,7 +1,7 @@
 # Code2Business（C2B）—— 从遗留代码还原业务知识
 
-> 当前正式版本：[**v0.5.0**](https://github.com/imlao17/Code2Business/releases/tag/v0.5.0)，发布日期 2026-09-11。
-> 版本变化见 [CHANGELOG.md](CHANGELOG.md) 和 [v0.5.0 发布说明](docs/releases/v0.5.0.md)。本版本把 Code2Business 接入 MCP 标准：AI 客户端（ZCode/Claude 等）可把扫描、语义、总报告当作工具直接调用；不等同于多租户商业交付版。
+> 当前正式版本：[**v0.6.0**](https://github.com/imlao17/Code2Business/releases/tag/v0.6.0)，发布日期 2026-09-11。
+> 版本变化见 [CHANGELOG.md](CHANGELOG.md) 和 [v0.6.0 发布说明](docs/releases/v0.6.0.md)。本版本将 macOS Desktop 重构为完全原生的 SwiftUI 应用（移除 Tauri 与 WebView），核心闭环全部原生可用；不等同于多租户商业交付版。
 
 Code2Business 把旧系统代码转换为可追溯、可确认、可交付的业务资产：
 

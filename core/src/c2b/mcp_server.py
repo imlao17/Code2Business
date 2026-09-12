@@ -289,6 +289,11 @@ def build_server():
 def serve() -> None:
     """以 stdio 传输运行 MCP 服务器（供 `c2b mcp` 调用）。"""
     _ensure_default_db()
+    # cli 模块级 import 已经按 cwd 默认值建好了引擎；在第一个连接建立前
+    # 用最终解析出的 DB URL 重建，避免把库写到 AI 客户端的工作目录。
+    from . import config, db
+    if config.DB_URL != os.environ.get("C2B_DB_URL"):
+        db.reset_engine(os.environ["C2B_DB_URL"])
     from .db import init_db
     init_db()
     build_server().run(transport="stdio")

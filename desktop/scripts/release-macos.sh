@@ -4,9 +4,10 @@ set -eu
 
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 DESKTOP_DIR="$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)"
-VERSION="$(node -p "require('$DESKTOP_DIR/package.json').version")"
+REPO_DIR="$(CDPATH= cd -- "$DESKTOP_DIR/.." && pwd)"
+VERSION="$(sed -n 's/^version = "\(.*\)"/\1/p' "$REPO_DIR/core/pyproject.toml" | head -n 1)"
 ARCH="$(uname -m)"
-APP_PATH="$DESKTOP_DIR/src-tauri/target/release/bundle/macos/C2B Desktop.app"
+APP_PATH="$DESKTOP_DIR/dist/C2B Desktop.app"
 DIST_DIR="$DESKTOP_DIR/dist"
 ARCHIVE_PATH="$DIST_DIR/C2B-Desktop-v$VERSION-macos-$ARCH.zip"
 DMG_PATH="$DIST_DIR/C2B-Desktop-v$VERSION-macos-$ARCH.dmg"

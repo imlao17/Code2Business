@@ -4,6 +4,42 @@
 （Web 工作台含 macOS Desktop 分发）、CLI、Agent Skills 共享同一个 `core` 引擎，并在同一次发布中使用相同版本号；
 三者仍可分别独立部署。
 
+## v0.6.0 — 2026-09-12
+
+发布状态：macOS Desktop 原生化重构（架构版本）。
+
+版本定位：macOS Desktop 从 Tauri（Rust + WebView 复用 Vue 页面）重构为**完全原生的
+SwiftUI 应用**——原生窗口、侧栏、菜单与目录选择器，不再打包浏览器内核；分析引擎仍是
+三产品共享的 `core/`，以 sidecar 内置于应用包，接口与数据格式零变更。
+
+### 变更
+
+- **原生壳**：新增 `desktop/app` Swift Package（约 2400 行 SwiftUI），复刻并超越旧壳职责面：
+  - 引擎生命周期：环境变量注入与旧壳完全一致（含 `C2B_DESKTOP_PARENT_PID` 孤儿防护）、
+    8123 就绪轮询、软单实例、退出清理；
+  - 原生界面：导航侧栏八个页面（总览/规则/业务对象与流程/业务推演/数据与接口/待确认项/
+    文档与交付物/帮助）、导入面板（本地目录 NSOpenPanel / Git / zip）、六步流程条、
+    规则确认工作台（确认/修改/废弃/批量/按可信度一键确认/导出 Excel）、客户交付总报告
+    下载（NSSavePanel）与 Markdown 原生预览、LLM 设置（含测试连接）、帮助中心；
+  - 菜单栏快捷键（⌘N 新建项目、⇧⌘R 一键分析）。
+- **移除 Tauri**：删除 `desktop/src-tauri`（Rust/pnpm/Node 工具链）与 desktop 的
+  package.json；desktop 构建不再需要 node/pnpm。CI `desktop-shell` job 改为
+  `swift build` + `swift test`。
+- **版本单一来源**：Desktop 版本号改从 `core/pyproject.toml` 读取，不再有独立 package.json。
+- Web 产品不受影响：Vue 前端与 Docker 部署原样保留。
+
+### v1 未含（可用 CLI/Web 操作同一数据库）
+
+模块需求规格批量分析、AI 问答（QA）、R1-R3 运行证据录入。
+
+### 验证
+
+- Swift 单测 8 项通过（API 响应解码契约、sidecar 配置）；98 项 Python 回归通过（新增引擎重定向回归：MCP 在任意 cwd 启动时库路径固定到 ~/.c2b）。
+- 打包版 .app 端到端冒烟通过：隔离数据目录启动 → 引擎就绪 → 导入样例仓库 →
+  `--no-ai` 一键分析 → 流程就绪 → 生成客户交付总报告 → 退出无孤儿 sidecar
+  （`scripts/smoke-app.sh` 已纳入 CI 语法检查）。
+- 真实 bundle 启动验证：bundle id `com.lao17.code2business` 延续，老用户数据无需迁移。
+
 ## v0.5.0 — 2026-09-11
 
 发布状态：MCP 接入版（功能版本）。

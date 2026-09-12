@@ -51,28 +51,19 @@ jobs:
       - run: pnpm build
 
   desktop-shell:
-    name: macOS Desktop shell check
+    name: macOS Desktop native shell check
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 10
-          run_install: false
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 20
-          cache: pnpm
-          cache-dependency-path: desktop/pnpm-lock.yaml
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Install desktop shell dependencies
-        run: pnpm --dir desktop install --frozen-lockfile
-      - name: Compile Desktop shell and Tauri configuration
-        run: pnpm --dir desktop check
+      - name: Build native SwiftUI shell
+        run: swift build --package-path desktop/app
+      - name: Run native shell unit tests
+        run: swift test --package-path desktop/app
       - name: Validate Desktop packaging scripts
         run: |
           sh -n desktop/scripts/build-macos.sh
           sh -n desktop/scripts/release-macos.sh
+          sh -n desktop/scripts/smoke-app.sh
           if C2B_MACOS_SIGNING_IDENTITY="Apple Development: CI" \
             sh desktop/scripts/release-macos.sh; then
             echo "release script accepted a non-distribution identity" >&2

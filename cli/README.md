@@ -1,6 +1,6 @@
 # C2B CLI（产品②）
 
-> 当前正式版本：[v0.5.0](https://github.com/imlao17/Code2Business/releases/tag/v0.5.0)。完整变化见[仓库变更日志](../CHANGELOG.md)。
+> 当前正式版本：[v0.6.0](https://github.com/imlao17/Code2Business/releases/tag/v0.6.0)。完整变化见[仓库变更日志](../CHANGELOG.md)。
 
 完整功能的命令行产品：扫描、AI 标注、模块规格、文档、问答和确定性图谱回归。它面向本地开发机、服务器、批处理和脚本化场景，分发物为一个 Python wheel。
 

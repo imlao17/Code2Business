@@ -145,5 +145,32 @@ class McpToolTests(unittest.TestCase):
         ])
 
 
+class DbRedirectTests(unittest.TestCase):
+    """`c2b mcp` 在 AI 客户端 cwd 下启动时不得把库写到工作目录。"""
+
+    def test_reset_engine_rebinds_sessions_to_new_url(self):
+        import tempfile
+        from contextlib import ExitStack
+        from pathlib import Path as _Path
+
+        from c2b import config, db
+
+        with tempfile.TemporaryDirectory() as td:
+            target = f"sqlite:///{_Path(td) / 'redirected.db'}"
+            original_engine, original_session = db.engine, db.SessionLocal
+            stack = ExitStack()
+            stack.callback(setattr, db, "engine", original_engine)
+            stack.callback(setattr, db, "SessionLocal", original_session)
+            stack.callback(setattr, config, "DB_URL", config.DB_URL)
+            try:
+                db.reset_engine(target)
+                self.assertEqual(config.DB_URL, target)
+                session = db.SessionLocal()
+                self.assertEqual(session.bind.engine.url.render_as_string(hide_password=False), target)
+                session.close()
+            finally:
+                stack.close()
+
+
 if __name__ == "__main__":
     unittest.main()

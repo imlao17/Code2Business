@@ -38,6 +38,19 @@ engine = make_engine()
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
 
+def reset_engine(url: str) -> None:
+    """替换全局引擎（仅供 mcp serve 等入口在首个连接建立前重定向数据库）。
+
+    cli 的模块级 import 会在读到一个环境变量之前就创建默认引擎；长驻入口
+    需要换库时必须显式重建，而不是只改 os.environ。
+    """
+    global engine, SessionLocal
+    engine = make_engine(url)
+    SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+    from . import config
+    config.DB_URL = url
+
+
 def init_db():
     from . import models  # noqa: F401  确保模型注册
     Base.metadata.create_all(engine)
