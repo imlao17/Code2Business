@@ -31,6 +31,12 @@ _PROMPT_CACHE_VERSION = "2026-08-08.2"
 _CACHE_LOCK = threading.Lock()
 _USAGE_LOCK = threading.Lock()
 
+# 缓存总量上限（默认 200MB）：超过后按写入时间淘汰最旧的缓存文件
+try:
+    _CACHE_MAX_BYTES = int(os.environ.get("C2B_LLM_CACHE_MAX_MB", "200")) * 1024 * 1024
+except ValueError:
+    _CACHE_MAX_BYTES = 200 * 1024 * 1024
+
 # 成本计数（进程内累计，按 token 估算）
 USAGE = {"requests": 0, "prompt_tokens": 0, "completion_tokens": 0,
          "failed": 0}
@@ -75,6 +81,29 @@ def _cache_fingerprint(
 
 def _cache_path(key: str) -> Path:
     return _CACHE_DIR / f"{key}.json"
+
+
+def _evict_cache(keep: Path) -> None:
+    """总量超过上限时按写入时间淘汰最旧的缓存（尽力而为，失败不影响调用）。"""
+    try:
+        entries = [p for p in _CACHE_DIR.glob("*.json") if p.is_file()]
+        total = sum(p.stat().st_size for p in entries)
+        if total <= _CACHE_MAX_BYTES:
+            return
+        entries.sort(key=lambda p: p.stat().st_mtime)
+        for p in entries:
+            if total <= _CACHE_MAX_BYTES:
+                break
+            if p == keep:
+                continue
+            try:
+                size = p.stat().st_size
+                p.unlink(missing_ok=True)
+                total -= size
+            except OSError:
+                pass
+    except OSError:
+        pass
 
 
 class LLMError(Exception):
@@ -334,6 +363,7 @@ class LLMClient:
                             )
                             os.chmod(temp, 0o600)
                             temp.replace(cpath)
+                        _evict_cache(cpath)
                     except OSError:
                         pass  # 缓存写入失败不影响结果
                 return result

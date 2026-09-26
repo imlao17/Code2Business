@@ -10,16 +10,16 @@ description: Code2Business 语义标注技能：把代码图谱还原为业务�
 ## 命令
 
 ```bash
-c2b export-evidence <project_id> --output c2b-evidence.json
-c2b agent-schema > c2b-semantic-result.json
-c2b import-semantic <project_id> --input c2b-semantic-result.json
+c2b export-evidence <project_id>            # 默认导出到 ~/.c2b/tmp/c2b-evidence.json
+c2b agent-schema > ~/.c2b/tmp/c2b-semantic-result.json
+c2b import-semantic <project_id>            # 默认读取 ~/.c2b/tmp/c2b-semantic-result.json，导入成功后自动删除
 c2b label <project_id> --limit 100 [--concurrency 16] [--model deepseek-chat]  # 可选云端路径
 c2b module-specs <project_id> [--module <id>] [--name <模块名>] [--force]
 ```
 
-- `export-evidence`：从已完成扫描导出模块、方法、接口、表及证据行号，不含模型 Key
+- `export-evidence`：从已完成扫描导出模块、方法、接口、表及证据行号，不含模型 Key；中间产物默认落在 `~/.c2b/tmp/`，**不要写入用户工作目录**
 - `agent-schema`：输出 Agent Native JSON 模板
-- `import-semantic`：校验每条规则的文件/行号/方法后，原子写入域、对象、规则、流程、推演和待确认项
+- `import-semantic`：校验每条规则的文件/行号/方法后，原子写入域、对象、规则、流程、推演和待确认项；临时目录下的输入文件导入成功后自动清理
 - `label`：可选云端路径，一次完成 业务域(S1) → 业务对象(S2) → 规则卡片(S3) → 流程(S4) → 业务推演(S6)
 - `module-specs`：模块级需求规格（功能点/流程/数据模型/规则/信息缺口）
 - `--force`：绕过 LLM 缓存完全重新生成
@@ -28,7 +28,7 @@ c2b module-specs <project_id> [--module <id>] [--name <模块名>] [--force]
 ## 执行顺序
 
 1. **先看状态**：`c2b status <project_id>`——必须已有完成扫描。
-2. **Agent Native（默认）**：执行 `c2b export-evidence <project_id> --output c2b-evidence.json`，阅读导出的证据和项目源码；执行 `c2b agent-schema` 取得模板，生成 `c2b-semantic-result.json`。不得编造规则：每条规则必须填写扫描内方法、文件和覆盖该规则的行号。然后执行 `c2b import-semantic <project_id> --input c2b-semantic-result.json`。
+2. **Agent Native（默认）**：执行 `c2b export-evidence <project_id>`，阅读导出的证据（`~/.c2b/tmp/c2b-evidence.json`）和项目源码；执行 `c2b agent-schema` 取得模板，把结果写入 `~/.c2b/tmp/c2b-semantic-result.json`。不得编造规则：每条规则必须填写扫描内方法、文件和覆盖该规则的行号。然后执行 `c2b import-semantic <project_id>`。
    - 展示：规则数/对象数/流程数/推演主线
    - 若导入拒绝，修正 JSON 中的证据或删除无法证实的结论后重试；禁止跳过校验直接写库。
 3. **可选云端标注**：仅当用户明确选择外部 Provider 时，执行 `c2b label <project_id> --limit 100`；质量好可建议 `--limit 400`。
@@ -50,6 +50,7 @@ c2b module-specs <project_id> [--module <id>] [--name <模块名>] [--force]
 ## 质量约束
 
 - 规则数异常少（<候选数 10%）时检查：候选选择策略（工具方法过滤）是否生效
-- 业务域为"未归类"时提示用户重跑（分批聚类已内置）
+- 业务域为“未归类”时提示用户重跑（分批聚类已内置）
 - 所有结论都有证据字段；人工确认在网页端「流程与规则」页完成
 - V 静态证据、R 运行验证和人工确认是独立维度；本 Skill 不会把 Agent 分析当成 R 证据。共享 Web 数据库时可在页面录入 R1-R3
+- 数据统一存 `~/.c2b/c2b.db`（CLI/MCP/Skills 同库）；不要用 `--output/--input` 把中间产物写到用户工作目录。发现旧版残留（当前目录的 c2b.db / c2b-evidence.json 等）时用 `c2b clean` 清理

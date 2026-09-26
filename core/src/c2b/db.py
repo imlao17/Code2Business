@@ -223,6 +223,24 @@ def _migrate_schema(target_engine=None) -> None:
                 )
 
 
+def shutdown_engine() -> None:
+    """干净收尾：合并 WAL 并释放连接池，避免残留 c2b.db-wal / c2b.db-shm。
+
+    CLI 在进程退出时经 atexit 调用。SQLite 在最后一个连接干净关闭时会把
+    WAL 数据合并回主库并删除 -wal/-shm；否则数据会滞留在 WAL 里，主库
+    文件单独拷贝/备份时会丢数据。尽力而为，失败不影响进程退出。
+    """
+    try:
+        with engine.connect() as conn:
+            conn.exec_driver_sql("PRAGMA wal_checkpoint(TRUNCATE)")
+    except Exception:
+        pass
+    try:
+        engine.dispose()
+    except Exception:
+        pass
+
+
 def get_session():
     s = SessionLocal()
     try:

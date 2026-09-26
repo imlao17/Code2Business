@@ -4,6 +4,39 @@
 （Web 工作台含 macOS Desktop 分发）、CLI、Agent Skills 共享同一个 `core` 引擎，并在同一次发布中使用相同版本号；
 三者仍可分别独立部署。
 
+## v0.6.1 — 2026-09-26
+
+发布状态：文件残留治理修复版。
+
+版本定位：修复 CLI 在任意工作目录遗留 `c2b.db` / `c2b.db-wal` / `c2b.db-shm` 与
+Agent Native 中间产物（证据/语义 JSON）的问题。此前 CLI 默认数据库跟随
+当前目录（`sqlite:///<cwd>/c2b.db`），换一个目录就新开一套库；v0.6.0 只把
+MCP 入口改到了 `~/.c2b/c2b.db`，CLI 被遗漏。
+
+### 变更
+
+- **统一默认数据库**：CLI 默认库改为 `~/.c2b/c2b.db`，与 MCP 一致（`C2B_DB_URL`
+  仍可覆盖）。首次运行发现当前目录存在旧版孤儿库且统一库尚未建立时，
+  自动用 sqlite backup 收编（合并 WAL，无损）；已有统一库则不覆盖。
+- **干净退出**：CLI 进程退出时释放连接池并 `wal_checkpoint(TRUNCATE)`，
+  SQLite 会把 WAL 合并回主库并删除 `-wal/-shm`。此前主库文件单独备份
+  会丢失滞留在 WAL 里的数据。
+- **中间产物不落工作目录**：`export-evidence` 默认输出到 `~/.c2b/tmp/`，
+  `import-semantic` 默认从该处读取并在导入成功后自动删除；交付文档仍由
+  用户显式指定路径。四个 Skill 文档同步改为 tmp 路径，并明确禁止把
+  中间产物写入用户工作目录。
+- **新增 `c2b clean`**：扫描并删除指定目录（默认当前目录）的旧版残留
+  （`c2b.db` / `c2b.db-wal` / `c2b.db-shm` / `c2b-evidence.json` /
+  `c2b-semantic-result.json`），可选 `--cache` 清空 LLM 缓存、`--tmp` 清空
+  中间产物目录。
+- **LLM 缓存上限**：`~/.c2b/llm_cache` 默认 200MB（`C2B_LLM_CACHE_MAX_MB`），
+  超限按写入时间淘汰最旧缓存，不再无限增长。
+
+### 验证
+
+- 104 项 Python 回归通过（v0.6.0 为 98 项；新增 6 项：孤儿库收编/不覆盖、
+  clean 识别与删除、导入成功自动清理 tmp 输入、用户自指定输入不被删）。
+
 ## v0.6.0 — 2026-09-12
 
 发布状态：macOS Desktop 原生化重构（架构版本）。

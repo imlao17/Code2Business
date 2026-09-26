@@ -1,6 +1,6 @@
 # C2B Agent Skills（产品③）
 
-> 当前正式版本：[v0.6.0](https://github.com/imlao17/Code2Business/releases/tag/v0.6.0)。完整变化见[仓库变更日志](../CHANGELOG.md)。
+> 当前正式版本：[v0.6.1](https://github.com/imlao17/Code2Business/releases/tag/v0.6.1)。完整变化见[仓库变更日志](../CHANGELOG.md)。
 
 这是面向 Claude Code、Codex、opencode 等兼容 Agent 宿主的独立技能产品。它让使用者通过自然语言编排“扫描 → 语义标注 → 模块规格 → 文档交付”，并要求 Agent 在每个阶段报告证据、覆盖范围和待确认项。
 

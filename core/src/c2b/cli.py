@@ -1,4 +1,5 @@
 """c2b CLI：项目创建、探测、扫描。"""
+import atexit
 import json
 import sys
 from datetime import datetime
@@ -7,8 +8,13 @@ from pathlib import Path
 import click
 
 from . import models
-from .db import SessionLocal, init_db
+from .config import TMP_DIR
+from .db import SessionLocal, init_db, shutdown_engine
 from .scanner.graph import Scanner
+
+# 进程退出时干净关闭数据库连接：SQLite 会把 WAL 合并回主库并删除
+# c2b.db-wal / c2b.db-shm，不再在每个工作目录留下三个文件的残留。
+atexit.register(shutdown_engine)
 
 
 @click.group()
@@ -175,13 +181,16 @@ def agent_schema():
 @cli.command("export-evidence")
 @click.argument("project_id", type=int)
 @click.option("--output", type=click.Path(dir_okay=False, path_type=Path),
-              required=True, help="导出的图谱证据 JSON 文件")
+              default=None,
+              help=f"导出路径（默认 {TMP_DIR / 'c2b-evidence.json'}，不污染当前目录）")
 @click.option("--max-methods", default=500, show_default=True, type=int,
               help="导出的方法数上限")
-def export_evidence_command(project_id: int, output: Path, max_methods: int):
+def export_evidence_command(project_id: int, output: Path | None, max_methods: int):
     """导出供当前 Agent 阅读的确定性图谱证据（无需 API Key）。"""
     from .semantics.agent_native import AgentSemanticError, export_evidence
 
+    if output is None:
+        output = TMP_DIR / "c2b-evidence.json"
     init_db()
     s = SessionLocal()
     try:
@@ -213,10 +222,73 @@ def import_semantic_command(project_id: int, input_path: Path):
     try:
         result = import_semantic(s, project_id, payload)
         click.echo(json.dumps(result, ensure_ascii=False, indent=2))
+        # 导入成功后，默认落在 ~/.c2b/tmp 的中间产物用完即删，不留在磁盘
+        try:
+            if input_path.resolve().parent == TMP_DIR.resolve():
+                input_path.unlink(missing_ok=True)
+        except OSError:
+            pass
     except AgentSemanticError as exc:
         raise click.ClickException(f"未导入：{exc}") from exc
     finally:
         s.close()
+
+
+@cli.command("clean")
+@click.option("--target", "target_dir", type=click.Path(exists=True,
+              file_okay=False, path_type=Path), default=None,
+              help="检查残留的目录（默认当前目录）")
+@click.option("--cache", is_flag=True, help="同时清空 ~/.c2b/llm_cache（LLM 结果缓存）")
+@click.option("--tmp", is_flag=True, help="同时清空 ~/.c2b/tmp（CLI 中间产物）")
+@click.option("--yes", is_flag=True, help="跳过确认直接删除")
+def clean(target_dir: Path | None, cache: bool, tmp: bool, yes: bool):
+    """清理 c2b 在指定目录遗留的文件（旧版孤儿库 / 中间产物）。
+
+    处理对象：c2b.db、c2b.db-wal、c2b.db-shm（旧版“当前目录默认库”残留），
+    以及当前目录下 Agent Native 中间产物 c2b-evidence.json、
+    c2b-semantic-result.json。统一库 ~/.c2b/c2b.db 与交付文档不受影响。
+    """
+    import shutil
+
+    target_dir = target_dir or Path.cwd()
+    residue_names = [
+        "c2b.db", "c2b.db-wal", "c2b.db-shm",
+        "c2b-evidence.json", "c2b-semantic-result.json",
+    ]
+    found = [p for p in (target_dir / n for n in residue_names) if p.exists()]
+
+    def _fmt(p: Path) -> str:
+        try:
+            size = p.stat().st_size
+            return f"  {p}  ({size / 1024:.0f} KB)"
+        except OSError:
+            return f"  {p}"
+
+    removed = 0
+    if found:
+        click.echo(f"在 {target_dir} 发现 c2b 残留：")
+        for p in found:
+            click.echo(_fmt(p))
+        if yes or click.confirm("删除以上文件？（孤儿库数据将不可恢复）"):
+            for p in found:
+                try:
+                    p.unlink(missing_ok=True)
+                    removed += 1
+                except OSError as exc:
+                    click.echo(f"跳过 {p}: {exc}", err=True)
+            click.echo(f"已删除 {removed} 个文件")
+    else:
+        click.echo(f"{target_dir} 没有 c2b 残留")
+
+    if cache:
+        from .llm import _CACHE_DIR
+        if _CACHE_DIR.exists():
+            shutil.rmtree(_CACHE_DIR, ignore_errors=True)
+            click.echo("已清空 LLM 结果缓存")
+    if tmp:
+        if TMP_DIR.exists():
+            shutil.rmtree(TMP_DIR, ignore_errors=True)
+            click.echo("已清空 CLI 中间产物目录")
 
 
 @cli.command()
