@@ -1,12 +1,12 @@
 # C2B CLI（产品②）
 
-> 当前正式版本：[v0.6.0](https://github.com/imlao17/Code2Business/releases/tag/v0.6.0)。完整变化见[仓库变更日志](../CHANGELOG.md)。
+> 当前正式版本：[v0.6.1](https://github.com/imlao17/Code2Business/releases/tag/v0.6.1)。完整变化见[仓库变更日志](../CHANGELOG.md)。
 
 完整功能的命令行产品：扫描、AI 标注、模块规格、文档、问答和确定性图谱回归。它面向本地开发机、服务器、批处理和脚本化场景，分发物为一个 Python wheel。
 
 **它解决什么问题？** 当你不需要浏览器工作台，而需要可重复执行、可纳入自动化、可在内网服务器运行的遗留系统分析能力时，使用 CLI。
 
-CLI 可独立安装和运行，**不依赖 Web 工作台或 Agent Skills**。默认使用本地 SQLite；生产或需要与 Web 共享结果时，再把 `C2B_DB_URL` 指向 PostgreSQL。三种产品的选择方式见根目录 [README](../README.md)。
+CLI 可独立安装和运行，**不依赖 Web 工作台或 Agent Skills**。v0.6.1 起默认数据库统一为 `~/.c2b/c2b.db`（不再随启动目录新建 `c2b.db`），与 MCP、Agent Skills 同库；生产或需要与 Web 共享结果时，再把 `C2B_DB_URL` 指向 PostgreSQL。三种产品的选择方式见根目录 [README](../README.md)。
 
 CLI 当前没有运行证据录入命令。若 CLI 与 Web 共用 PostgreSQL，可在 Web 中为 CLI 生成的规则、流程和推演录入 R1-R3 证据，之后 `c2b docs` 会读取并展示这些记录；只使用 CLI 时也不影响扫描、语义或文档功能，未记录目标显示为 R0。
 
@@ -54,15 +54,22 @@ c2b status <project_id>                   # 流程状态（✅🔄⬜ 六步）
 c2b evaluate <project_id> --manifest quality.json  # 固定样本的 API/表/SQL 图谱回归
 c2b label <project_id> --limit 100        # AI 标注：域/对象/规则/流程/推演
       # 可选：--concurrency 16（并发）、--model deepseek-chat（快）、--no-cache
-c2b export-evidence <project_id> --output evidence.json  # 导出当前 Agent 可审阅的图谱证据
-c2b agent-schema > semantic-result.json                  # 输出 Agent Native JSON 模板
-c2b import-semantic <project_id> --input semantic-result.json  # 校验并原子导入业务语义
+c2b export-evidence <project_id>          # 导出当前 Agent 可审阅的图谱证据
+      # 默认写 ~/.c2b/tmp/c2b-evidence.json；--output 可自定路径
+c2b agent-schema                          # 输出 Agent Native JSON 模板（stdout）
+c2b import-semantic <project_id>          # 校验并原子导入业务语义
+      # 默认读 ~/.c2b/tmp/c2b-semantic-result.json，导入成功自动删除；--input 可自定
 c2b module-specs <project_id>             # 全部模块需求规格
       # 可选：--name Sms01206（按名）、--module <id>、--force（绕过缓存）
 c2b docs <project_id> --type overview     # 交付文档（md/word）
-      # 类型：overview/functions/rules/dictionary/apis/acceptance
+      # 类型：overview/functions/rules/dictionary/apis/acceptance/combined
 c2b export-specs <project_id>             # 模块规格打包 zip
+c2b pipeline <代码目录> --name <项目名> --out ./deliverables
+      # 一条龙：扫描 → AI 标注 → 模块规格 → 全部交付文档（--no-ai 只扫描）
 c2b qa <project_id> "采购订单审批通过后会发生什么？"   # AI 问答
+c2b mcp                                   # 以 stdio 运行 MCP 服务器（8 个工具，供 AI 客户端调用）
+c2b clean [--target <目录>] [--cache] [--tmp] [--yes]
+      # 清理旧版残留：当前目录的 c2b.db/c2b-evidence.json 等；--cache/--tmp 清空缓存
 ```
 
 ## 典型工作流：从代码到交付物
@@ -104,10 +111,10 @@ c2b scan /path/to/code --name 项目A --project-id <project_id>
 
 ```bash
 c2b scan /path/to/code --name 项目A
-c2b export-evidence 1 --output evidence.json
-c2b agent-schema > semantic-result.json
-# 让当前 Agent 根据 evidence.json 和源码填充 semantic-result.json
-c2b import-semantic 1 --input semantic-result.json
+c2b export-evidence 1
+c2b agent-schema > ~/.c2b/tmp/c2b-semantic-result.json
+# 让当前 Agent 根据 ~/.c2b/tmp/c2b-evidence.json 和源码填充语义结果
+c2b import-semantic 1
 c2b docs 1 --type overview --output 系统现状说明书.md
 ```
 
@@ -124,11 +131,12 @@ c2b docs 1 --type overview --output 系统现状说明书.md
 
 ## 说明
 
+- **数据存放**：v0.6.1 起所有分析数据统一写 `~/.c2b/c2b.db`，不再在当前目录新建 `c2b.db`；首次运行会自动收编当前目录的旧版孤儿库。中间产物放 `~/.c2b/tmp/`，导入成功自动清理。发现旧版残留时用 `c2b clean` 清理
 - `./build-wheel.sh` 默认同步 CLI 和 Agent Skill 的 wheel，避免多个分发形态版本不一致
 - `./build-wheel.sh --copy-to <dir>` 可把同一 wheel 复制到额外目录；网页端部署脚本用它把 wheel 同步到 `web/deploy/dist/`
-- **缓存**：LLM 结果缓存于 `~/.c2b/llm_cache`，重复跑不重复计费；`--no-cache`/`--force` 强制重新生成
+- **缓存**：LLM 结果缓存于 `~/.c2b/llm_cache`，总量上限默认 200MB（`C2B_LLM_CACHE_MAX_MB`），超限淘汰最旧；重复跑不重复计费，`--no-cache`/`--force` 强制重新生成
 - **成本**：DeepSeek 下全量标注 400 方法约 ¥1-2
-- **与网页互通（可选）**：`C2B_DB_URL` 指向同一 PostgreSQL 数据库时，CLI 分析结果可在网页工作台中直接查看
+- **与网页互通（可选）**：`C2B_DB_URL` 指向同一 PostgreSQL 数据库时，CLI 分析结果可在网页工作台中直接查看；`c2b mcp` 供支持 MCP 的 AI 客户端直接调用（配置示例见 [skill/README.md](../skill/README.md)）
 - **探测与正式扫描**：若先执行 `c2b scan ... --probe-only`，确认后用 `c2b scan <代码目录> --name <项目名> --project-id <id>` 继续正式扫描，避免重复创建项目
 - **质量基线**：`c2b evaluate` 以人工维护的已知代码事实检查最新扫描，适合接入外部 CI；它不等于 LLM 语义准确率。固定 RuoYi-Vue 样本的清单与人工抽样方法见 [`docs/quality-baseline.md`](../docs/quality-baseline.md)
 - 更多使用细节见根目录 `docs/architecture.md`
