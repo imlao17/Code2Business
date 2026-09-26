@@ -53,4 +53,4 @@ c2b module-specs <project_id> [--module <id>] [--name <模块名>] [--force]
 - 业务域为“未归类”时提示用户重跑（分批聚类已内置）
 - 所有结论都有证据字段；人工确认在网页端「流程与规则」页完成
 - V 静态证据、R 运行验证和人工确认是独立维度；本 Skill 不会把 Agent 分析当成 R 证据。共享 Web 数据库时可在页面录入 R1-R3
-- 数据统一存 `~/.c2b/c2b.db`（CLI/MCP/Skills 同库）；不要用 `--output/--input` 把中间产物写到用户工作目录。发现旧版残留（当前目录的 c2b.db / c2b-evidence.json 等）时用 `c2b clean` 清理
+- 数据统一存 `~/.c2b/c2b.db`（CLI/MCP/Skills 同库）；不要用 `--output/--input` 把中间产物写到用户工作目录。发现旧版残留（当前目录的 c2b.db / c2b-evidence.json 等）时用 `c2b clean --yes` 清理（非交互场景必须带 `--yes`，否则会卡在确认）

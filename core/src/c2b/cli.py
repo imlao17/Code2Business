@@ -206,12 +206,19 @@ def export_evidence_command(project_id: int, output: Path | None, max_methods: i
 
 @cli.command("import-semantic")
 @click.argument("project_id", type=int)
-@click.option("--input", "input_path", type=click.Path(exists=True, dir_okay=False,
-              readable=True, path_type=Path), required=True,
-              help="当前 Agent 生成的语义 JSON 文件")
-def import_semantic_command(project_id: int, input_path: Path):
+@click.option("--input", "input_path", type=click.Path(dir_okay=False,
+              readable=True, path_type=Path), default=None,
+              help=f"语义 JSON 文件（默认 {TMP_DIR / 'c2b-semantic-result.json'}，导入成功后自动删除）")
+def import_semantic_command(project_id: int, input_path: Path | None):
     """校验并导入 Agent Native 的业务域、规则、对象、流程和推演。"""
     from .semantics.agent_native import AgentSemanticError, import_semantic
+
+    if input_path is None:
+        input_path = TMP_DIR / "c2b-semantic-result.json"
+    if not input_path.exists():
+        raise click.ClickException(
+            f"未找到语义 JSON：{input_path}。先执行 c2b agent-schema 生成模板，"
+            "或用 --input 指定文件路径")
 
     try:
         payload = json.loads(input_path.read_text(encoding="utf-8"))

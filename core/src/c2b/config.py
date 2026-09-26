@@ -47,7 +47,8 @@ def _adopt_orphan_db(orphan: Path, target: Path) -> bool:
     """
     try:
         target.parent.mkdir(parents=True, exist_ok=True)
-        src = sqlite3.connect(f"file:{orphan}?mode=ro", uri=True)
+        # as_uri() 会做百分号转义，路径含空格/中文/特殊字符也能正确打开
+        src = sqlite3.connect(orphan.resolve().as_uri() + "?mode=ro", uri=True)
         dst = sqlite3.connect(target)
         try:
             with dst:

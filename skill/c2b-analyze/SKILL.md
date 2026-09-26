@@ -81,4 +81,4 @@ c2b export-specs <project_id> --output module-specs.zip
 - LLM 结果不可信时（规则数异常少/空），提示用户检查 LLM Key 或重跑
 - 涉及大量 LLM 调用的操作（全量标注/全部模块规格）先询问用户
 - 中间产物（证据/语义 JSON）只放 `~/.c2b/tmp/`，导入成功自动清理；交付文档才写入用户目录
-- 数据统一存 `~/.c2b/c2b.db`；发现旧版残留（当前目录的 c2b.db 等）时用 `c2b clean` 清理
+- 数据统一存 `~/.c2b/c2b.db`；发现旧版残留（当前目录的 c2b.db 等）时用 `c2b clean --yes` 清理（非交互场景必须带 `--yes`）

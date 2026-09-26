@@ -144,6 +144,56 @@ class TmpArtifactTests(unittest.TestCase):
             self.assertFalse(evidence.exists())
             engine.dispose()
 
+    def test_import_reads_default_tmp_input_without_option(self):
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td) / "tmp"
+            evidence = tmp_dir / "c2b-semantic-result.json"
+
+            engine = create_engine(f"sqlite:///{Path(td) / 't.db'}")
+            Base.metadata.create_all(engine)
+            project_id = self._project(engine)
+            evidence.parent.mkdir(parents=True, exist_ok=True)
+            evidence.write_text(json.dumps({
+                "contract_version": "1.0",
+                "domains": [{
+                    "name": "演示域", "description": "演示",
+                    "modules": [], "confidence": 60,
+                }],
+                "objects": [], "rules": [], "flows": [],
+                "chain": None, "questions": [],
+            }, ensure_ascii=False), encoding="utf-8")
+
+            Session = sessionmaker(bind=engine, expire_on_commit=False)
+            with patch("c2b.cli.init_db"), \
+                    patch("c2b.cli.SessionLocal", Session), \
+                    patch("c2b.cli.TMP_DIR", tmp_dir):
+                # 不传 --input，应回落到默认 tmp 路径并自动清理
+                result = CliRunner().invoke(
+                    cli, ["import-semantic", str(project_id)])
+
+            self.assertEqual(result.exit_code, 0, result.output)
+            self.assertFalse(evidence.exists())
+            engine.dispose()
+
+    def test_import_missing_default_input_gives_actionable_error(self):
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td) / "tmp"
+            tmp_dir.mkdir()
+            engine = create_engine(f"sqlite:///{Path(td) / 't.db'}")
+            Base.metadata.create_all(engine)
+            project_id = self._project(engine)
+
+            Session = sessionmaker(bind=engine, expire_on_commit=False)
+            with patch("c2b.cli.init_db"), \
+                    patch("c2b.cli.SessionLocal", Session), \
+                    patch("c2b.cli.TMP_DIR", tmp_dir):
+                result = CliRunner().invoke(
+                    cli, ["import-semantic", str(project_id)])
+
+            self.assertEqual(result.exit_code, 1)
+            self.assertIn("agent-schema", result.output)
+            engine.dispose()
+
     def test_import_keeps_user_input_outside_tmp(self):
         with tempfile.TemporaryDirectory() as td:
             tmp_dir = Path(td) / "tmp"

@@ -1,6 +1,6 @@
 # C2B Desktop（macOS 原生应用）
 
-> 当前正式版本：[v0.6.0](https://github.com/imlao17/Code2Business/releases/tag/v0.6.0)。C2B Desktop 是 Web 工作台的本地优先分发形态，不是第四套业务引擎。Release 附带的 macOS 包为 Apple Silicon（arm64）未签名试用包；签名、公证与架构边界见下文。
+> 当前正式版本：[v0.6.1](https://github.com/imlao17/Code2Business/releases/tag/v0.6.1)。C2B Desktop 是 Web 工作台的本地优先分发形态，不是第四套业务引擎。Release 附带的 macOS 包为 Apple Silicon（arm64）未签名试用包；签名、公证与架构边界见下文。
 
 C2B Desktop 是一个**完全原生的 SwiftUI 应用**：原生窗口、侧栏、菜单和目录选择器，没有 WebView。业务分析引擎仍是三产品共享的 `core/`（Python），以 PyInstaller sidecar 形式内置于应用包 `Contents/Resources/c2b-api`，只在 127.0.0.1:8123 本机回环监听。
 
