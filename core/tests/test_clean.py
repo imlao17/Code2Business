@@ -89,6 +89,25 @@ class CleanCommandTests(unittest.TestCase):
                          "c2b-evidence.json", "c2b-semantic-result.json"):
                 self.assertFalse((Path(td) / name).exists())
 
+    def test_clean_refuses_to_delete_active_unified_db(self):
+        with tempfile.TemporaryDirectory() as td:
+            home = Path(td) / "home"
+            home.mkdir()
+            for name in ("c2b.db", "c2b.db-wal", "c2b.db-shm",
+                         "c2b-evidence.json"):
+                (home / name).write_text("x", encoding="utf-8")
+
+            with patch("c2b.cli.DB_URL", f"sqlite:///{home / 'c2b.db'}"):
+                result = CliRunner().invoke(
+                    cli, ["clean", "--target", str(home), "--yes"])
+
+            self.assertEqual(result.exit_code, 0, result.output)
+            # 数据库三件套受保护，不会被 --yes 删掉
+            for name in ("c2b.db", "c2b.db-wal", "c2b.db-shm"):
+                self.assertTrue((home / name).exists(), name)
+            # 非数据库残留照常清理
+            self.assertFalse((home / "c2b-evidence.json").exists())
+
     def test_clean_reports_nothing_when_directory_is_clean(self):
         with tempfile.TemporaryDirectory() as td:
             result = CliRunner().invoke(cli, ["clean", "--target", td, "--yes"])

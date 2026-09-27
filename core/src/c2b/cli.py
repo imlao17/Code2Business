@@ -8,7 +8,7 @@ from pathlib import Path
 import click
 
 from . import models
-from .config import TMP_DIR
+from .config import DB_URL, TMP_DIR
 from .db import SessionLocal, init_db, shutdown_engine
 from .scanner.graph import Scanner
 
@@ -263,6 +263,20 @@ def clean(target_dir: Path | None, cache: bool, tmp: bool, yes: bool):
         "c2b-evidence.json", "c2b-semantic-result.json",
     ]
     found = [p for p in (target_dir / n for n in residue_names) if p.exists()]
+
+    # 安全护栏：目标目录是当前使用的数据库所在目录时，跳过数据库三件套，
+    # 防止 `c2b clean --target ~/.c2b --yes` 这类误操作删掉统一库。
+    if DB_URL.startswith("sqlite:///"):
+        try:
+            active_dir = Path(DB_URL[len("sqlite:///"):]).resolve().parent
+        except OSError:
+            active_dir = None
+        if active_dir is not None and target_dir.resolve() == active_dir:
+            db_names = {"c2b.db", "c2b.db-wal", "c2b.db-shm"}
+            found = [p for p in found if p.name not in db_names]
+            click.echo(
+                f"跳过统一数据库所在目录 {active_dir} 的数据库文件（防误删）；"
+                "如需重置数据请手动处理")
 
     def _fmt(p: Path) -> str:
         try:
